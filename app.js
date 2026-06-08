@@ -536,4 +536,152 @@ ${notaPromoTxt ? `<div class="promo">🌟 Tradicionales: ${notaPromoTxt}</div>` 
 
   const auditUrl = 'data:text/html;base64,' + btoa(unescape(encodeURIComponent(auditHtml)));
 
-  /* Mensaje exacto de WhatsA
+/* Mensaje exacto de WhatsApp */
+  const mensaje = `Ya hice mi pedido a Pupusería Ruiz, por favor míralo aquí: ${auditUrl}`;
+
+  return { calc, filasModalHtml, notaPromoTxt, auditUrl, mensaje };
+}
+
+/* ─────────────────────────────────────────────────────
+   9. MODAL DE CONFIRMACIÓN (auditoría para el cliente)
+───────────────────────────────────────────────────── */
+function abrirModal() {
+  if (pedido.length === 0) return;
+  const { calc, filasModalHtml, notaPromoTxt, auditUrl, mensaje } = buildAuditoria();
+
+  document.getElementById('modal-body').innerHTML = `
+    <table class="audit-tabla">
+      <thead><tr><th>Cant.</th><th>Pupusa</th><th>Masa</th></tr></thead>
+      <tbody>${filasModalHtml}</tbody>
+    </table>
+    ${notaPromoTxt ? `<div class="audit-promo">🌟 Tradicionales: ${notaPromoTxt}</div>` : ''}
+    <div class="audit-total">
+      <span class="lbl">TOTAL A PAGAR</span>
+      <span class="val">$${calc.totalMonto.toFixed(2)}</span>
+    </div>
+    <div class="audit-sello">
+      ✅ El link de auditoría va incluido en el mensaje de WhatsApp
+      para que la pupusera pueda verificar tu pedido.
+    </div>`;
+
+  _waUrl = `https://wa.me/${MENU_CONFIG.whatsapp}?text=${encodeURIComponent(mensaje)}`;
+
+  document.getElementById('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* ─────────────────────────────────────────────────────
+   10. TOAST + BIENVENIDA ANIMADA
+   Secuencia:
+   1. Abre drawer izquierdo 500ms → cierra → parpadea
+      botón "Menú" 2 veces
+   2. Abre drawer derecho 500ms → cierra → parpadea
+      botón "Pedido completo" 2 veces
+   3. Muestra toast centrado durante 3 segundos
+───────────────────────────────────────────────────── */
+function parpadearBoton(btnEl, veces, intervalo) {
+  return new Promise(resolve => {
+    let count = 0;
+    const tick = () => {
+      btnEl.classList.toggle('blink-on');
+      count++;
+      if (count < veces * 2) {
+        setTimeout(tick, intervalo);
+      } else {
+        btnEl.classList.remove('blink-on');
+        resolve();
+      }
+    };
+    setTimeout(tick, 80);
+  });
+}
+
+function bienvenida() {
+  const toast   = document.getElementById('toast');
+  const btnMenu  = document.getElementById('btn-abrir-menu');
+  const btnPed   = document.getElementById('btn-abrir-pedido');
+
+  /* 1. Abrir drawer izquierdo */
+  setTimeout(() => {
+    openDrawerLeft();
+
+    /* 2. Cerrar drawer izquierdo tras 500ms → parpadear botón Menú */
+    setTimeout(() => {
+      closeDrawerLeft();
+
+      parpadearBoton(btnMenu, 2, 200).then(() => {
+
+        /* 3. Abrir drawer derecho */
+        setTimeout(() => {
+          openDrawerRight();
+
+          /* 4. Cerrar drawer derecho tras 500ms → parpadear botón Pedido */
+          setTimeout(() => {
+            closeDrawerRight();
+
+            parpadearBoton(btnPed, 2, 200).then(() => {
+
+              /* 5. Mostrar toast centrado durante 3 segundos */
+              setTimeout(() => {
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 3000);
+              }, 200);
+
+            });
+          }, 500);
+        }, 300);
+
+      });
+    }, 500);
+
+  }, 400);
+}
+
+/* ─────────────────────────────────────────────────────
+   11. INIT
+───────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+
+  /* ── Drawer izquierdo ── */
+  document.getElementById('btn-abrir-menu').addEventListener('click', openDrawerLeft);
+  document.getElementById('overlay-left').addEventListener('click', closeDrawerLeft);
+  document.getElementById('drawer-left-close').addEventListener('click', closeDrawerLeft);
+
+  /* ── Drawer derecho ── */
+  document.getElementById('btn-abrir-pedido').addEventListener('click', openDrawerRight);
+  document.getElementById('overlay-right').addEventListener('click', closeDrawerRight);
+  document.getElementById('drawer-right-close').addEventListener('click', closeDrawerRight);
+
+  /* ── Modal Loca ── */
+  document.getElementById('modal-loca-close').addEventListener('click', cerrarModalLoca);
+  document.getElementById('btn-loca-cancel').addEventListener('click', cerrarModalLoca);
+  document.getElementById('btn-loca-listo').addEventListener('click', confirmarLoca);
+  document.getElementById('modal-loca-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-loca-overlay')) cerrarModalLoca();
+  });
+
+  /* ── Modal de confirmación / auditoría ── */
+  document.getElementById('modal-close').addEventListener('click', cerrarModal);
+  document.getElementById('btn-modal-cancel').addEventListener('click', cerrarModal);
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-overlay')) cerrarModal();
+  });
+  document.getElementById('btn-modal-wa').addEventListener('click', () => {
+    window.open(_waUrl, '_blank');
+    cerrarModal();
+  });
+
+  /* ── Render inicial ── */
+  renderMenu();
+  renderDrawerPedido();
+  actualizarBadge();
+
+  /* ── Bienvenida animada ── */
+  bienvenida();
+});
+

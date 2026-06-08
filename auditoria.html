@@ -1,1 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pedido — Pupusería Ruiz</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main style="padding: 20px;">
+    <h1>🧾 Pedido Verificado</h1>
+    <div id="detalle-pedido">Cargando detalles...</div>
+  </main>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const pedidoId = params.get('id');
+    const pedidoData = localStorage.getItem('pedido_' + pedidoId);
+    
+    if (pedidoData) {
+      document.getElementById('detalle-pedido').innerHTML = pedidoData;
+    } else {
+      document.getElementById('detalle-pedido').innerHTML = "Pedido no encontrado o expirado.";
+    }
+  </script>
+</body>
+</html>
 

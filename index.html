@@ -4,44 +4,35 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Pupusería Ruiz | Pedidos</title>
-  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-<!-- ══ OVERLAY IZQUIERDO (cierra drawer-menu) ══ -->
 <div class="overlay overlay-left"  id="overlay-left"></div>
 
-<!-- ══ OVERLAY DERECHO (cierra drawer-pedido) ══ -->
 <div class="overlay overlay-right" id="overlay-right"></div>
 
-<!-- ══ DRAWER IZQUIERDO — Menú de precios ══ -->
 <div class="drawer drawer-left" id="drawer-left">
   <div class="drawer-head">
     <h2>🧾 Menú</h2>
     <button class="drawer-close" id="drawer-left-close" aria-label="Cerrar menú">✕</button>
   </div>
   <div class="drawer-body" id="drawer-left-body">
-    <!-- buildDrawerMenu() lo llena -->
   </div>
 </div>
 
-<!-- ══ DRAWER DERECHO — Pedido completo ══ -->
 <div class="drawer drawer-right" id="drawer-right">
   <div class="drawer-head">
     <h2>🧺 Pedido completo</h2>
     <button class="drawer-close" id="drawer-right-close" aria-label="Cerrar pedido">✕</button>
   </div>
   <div class="drawer-body" id="drawer-right-body">
-    <!-- renderDrawerPedido() lo llena -->
   </div>
   <div class="drawer-footer" id="drawer-footer">
-    <!-- total + botón generar pedido -->
   </div>
 </div>
 
-<!-- ══ HEADER ══ -->
 <header>
-  <!-- Botón izquierdo: Menú -->
   <button class="hdr-btn" id="btn-abrir-menu" aria-label="Ver menú de precios">
     <span class="hdr-btn-lines"><span></span><span></span><span></span></span>
     <span class="hdr-btn-label">Menú</span>
@@ -51,27 +42,22 @@
     <h1>Pupusería Ruiz</h1>
   </div>
 
-  <!-- Botón derecho: Pedido completo -->
   <button class="hdr-btn hdr-btn-right" id="btn-abrir-pedido" aria-label="Ver pedido completo">
     <span class="hdr-btn-label">Pedido completo</span>
     <span class="hdr-badge" id="hdr-badge"></span>
   </button>
 </header>
 
-<!-- ══ TOAST — mensaje de bienvenida ══ -->
 <div class="toast" id="toast">
   Haz tu pedido tocando los botones del ingrediente que desees y eligiendo tu masa 🫓
 </div>
 
-<!-- ══ CONTENIDO PRINCIPAL ══ -->
 <main>
   <h2 class="section-title"><span>🫓</span> Elige tu pupusa</h2>
   <div class="menu-grid" id="menu-grid">
-    <!-- renderMenu() lo llena -->
   </div>
 </main>
 
-<!-- ══ MODAL PUPUSA LOCA — Editor de ingredientes ══ -->
 <div class="modal-overlay" id="modal-loca-overlay">
   <div class="modal modal-loca">
     <div class="modal-head modal-head-loca">
@@ -79,7 +65,6 @@
       <button class="modal-close" id="modal-loca-close" aria-label="Cerrar">✕</button>
     </div>
     <div class="modal-body" id="modal-loca-body">
-      <!-- abrirModalLoca() lo llena -->
     </div>
     <div class="modal-footer">
       <button class="btn-modal-cancel" id="btn-loca-cancel">Cancelar</button>
@@ -88,7 +73,6 @@
   </div>
 </div>
 
-<!-- ══ MODAL AUDITORÍA — Confirmación y WhatsApp ══ -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
     <div class="modal-head">
@@ -96,7 +80,6 @@
       <button class="modal-close" id="modal-close" aria-label="Cerrar">✕</button>
     </div>
     <div class="modal-body" id="modal-body">
-      <!-- abrirModal() lo llena -->
     </div>
     <div class="modal-footer">
       <button class="btn-modal-cancel" id="btn-modal-cancel">Cancelar</button>
@@ -105,7 +88,7 @@
   </div>
 </div>
 
-<script src="data/menu.js"></script>
-<script src="js/app.js"></script>
+<script src="menu.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

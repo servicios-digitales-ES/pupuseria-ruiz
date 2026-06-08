@@ -416,11 +416,11 @@ function renderDrawerPedido() {
 }
 
 /* ─────────────────────────────────────────────────────
-   7. AUDITORÍA Y WHATSAPP (MODIFICADA PARA GITHUB)
+   7. AUDITORÍA Y WHATSAPP
 ───────────────────────────────────────────────────── */
 function buildAuditoria() {
   const calc = calcularTotal();
-  const pedidoId = Date.now(); // ID único para el local storage
+  const pedidoId = Date.now();
   const { tradicional } = MENU_CONFIG;
 
   const grupos = new Map();
@@ -452,11 +452,11 @@ function buildAuditoria() {
 
   let notaPromoTxt = '';
   if (calc.totalTrad > 0) {
-    if (calc.lotes   > 0) notaPromoTxt += `${calc.lotes} grupo(s) = $${(calc.lotes * tradicional.promoPrecio).toFixed(2)}  `;
+    if (calc.lotes > 0) notaPromoTxt += `${calc.lotes} grupo(s) = $${(calc.lotes * tradicional.promoPrecio).toFixed(2)}  `;
     if (calc.sueltas > 0) notaPromoTxt += `· ${calc.sueltas} unidad(es) = $${(calc.sueltas * tradicional.precioUnidad).toFixed(2)}`;
   }
 
-  /* HTML de la página de auditoría */
+  /* HTML completo de la página de auditoría */
   const auditHtml = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Pedido — Pupusería Ruiz</title>
 <style>body{font-family:Arial;padding:20px;max-width:480px;margin:0 auto} 
@@ -466,15 +466,14 @@ td{padding:10px;border-bottom:1px solid #DDD;} .total{font-weight:900;font-size:
 <table><thead><tr><th>Cant.</th><th>Pupusa</th><th>Masa</th></tr></thead><tbody>${filasAuditHtml}</tbody></table>
 <div class="total">TOTAL: $${calc.totalMonto.toFixed(2)}</div></body></html>`;
 
-  /* Guardar en localStorage */
   localStorage.setItem('pedido_' + pedidoId, auditHtml);
 
-  /* Link hacia GitHub Pages */
   const auditUrl = `https://servicios-digitales-es.github.io/pupuseria-ruiz/auditoria.html?id=${pedidoId}`;
   const mensaje = `Ya hice mi pedido a Pupusería Ruiz, por favor míralo aquí: ${auditUrl}`;
 
   return { calc, filasModalHtml, notaPromoTxt, mensaje };
 }
+
 
 /* ─────────────────────────────────────────────────────
    9. MODAL DE CONFIRMACIÓN

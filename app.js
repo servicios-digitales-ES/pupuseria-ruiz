@@ -207,10 +207,6 @@ function renderMenu() {
 
 /* ─────────────────────────────────────────────────────
    4. MODAL EDITOR — PUPUSA LOCA
-   Título: "Toca el ingrediente que NO quieres dentro
-            de tu pupusa loca"
-   Todos los ingredientes marcados por defecto.
-   Al presionar ¡Listo! agrega al pedido con nota.
 ───────────────────────────────────────────────────── */
 function abrirModalLoca(item, masa) {
   _locaMasa     = masa;
@@ -360,7 +356,7 @@ function renderDrawerPedido() {
     return;
   }
 
-  /* Agrupar por nombre + masa + nota (Locas con notas distintas quedan separadas) */
+  /* Agrupar por nombre + masa + nota */
   const grupos = new Map();
   pedido.forEach(p => {
     const k = p.nombre + '||' + p.masa + '||' + (p.nota || '');
@@ -396,8 +392,8 @@ function renderDrawerPedido() {
   if (calc.totalTrad > 0) {
     const { tradicional } = MENU_CONFIG;
     let t = '';
-    if (calc.lotes   > 0) t += `${calc.lotes} grup${calc.lotes > 1 ? 'os' : 'o'} de ${tradicional.promoQty} = $${(calc.lotes * tradicional.promoPrecio).toFixed(2)}`;
-    if (calc.sueltas > 0) t += `${t ? '  ·  ' : ''}${calc.sueltas} unidad${calc.sueltas > 1 ? 'es' : ''} = $${(calc.sueltas * tradicional.precioUnidad).toFixed(2)}`;
+    if (calc.lotes   > 0) t += `${calc.lotes} grupo(s) de ${tradicional.promoQty} = $${(calc.lotes * tradicional.promoPrecio).toFixed(2)}`;
+    if (calc.sueltas > 0) t += `${t ? '  ·  ' : ''}${calc.sueltas} unidad(es) = $${(calc.sueltas * tradicional.precioUnidad).toFixed(2)}`;
     notaPromoHtml = `<div class="ped-promo-nota show">🌟 Tradicionales: ${t}</div>`;
   }
 
@@ -420,38 +416,13 @@ function renderDrawerPedido() {
 }
 
 /* ─────────────────────────────────────────────────────
-   7. BADGE Y PULSO
-───────────────────────────────────────────────────── */
-function actualizarBadge() {
-  const badge = document.getElementById('hdr-badge');
-  if (pedido.length === 0) {
-    badge.textContent = '';
-    badge.classList.remove('visible');
-  } else {
-    badge.textContent = pedido.length;
-    badge.classList.add('visible');
-  }
-}
-
-function pulsarBotonPedido() {
-  const btn = document.getElementById('btn-abrir-pedido');
-  btn.classList.remove('pulso');
-  void btn.offsetWidth;
-  btn.classList.add('pulso');
-  btn.addEventListener('animationend', () => btn.classList.remove('pulso'), { once: true });
-}
-
-/* ─────────────────────────────────────────────────────
-   8. AUDITORÍA Y WHATSAPP
-   Mensaje: "Ya hice mi pedido a Pupusería Ruiz,
-             por favor míralo aquí: [LINK]"
-   Link: página HTML de auditoría en data URI Base64
+   7. AUDITORÍA Y WHATSAPP (MODIFICADA PARA GITHUB)
 ───────────────────────────────────────────────────── */
 function buildAuditoria() {
   const calc = calcularTotal();
-  const { tradicional, precioEspecial, precioLoca } = MENU_CONFIG;
+  const pedidoId = Date.now(); // ID único para el local storage
+  const { tradicional } = MENU_CONFIG;
 
-  /* Agrupar igual que el drawer */
   const grupos = new Map();
   pedido.forEach(p => {
     const k = p.nombre + '||' + p.masa + '||' + (p.nota || '');
@@ -465,7 +436,6 @@ function buildAuditoria() {
   grupos.forEach(g => {
     const notaTd    = g.nota ? `<br><small style="color:#888">${g.nota}</small>` : '';
     const notaAudit = g.nota ? ` (${g.nota})` : '';
-    const cantStr   = g.cant > 1 ? `${g.cant}× ` : '';
 
     filasModalHtml += `<tr>
       <td class="at-cant">${g.cant}</td>
@@ -480,124 +450,38 @@ function buildAuditoria() {
     </tr>`;
   });
 
-  /* Nota promo */
   let notaPromoTxt = '';
   if (calc.totalTrad > 0) {
-    if (calc.lotes   > 0) notaPromoTxt += `${calc.lotes} grupo(s) de ${tradicional.promoQty} = $${(calc.lotes * tradicional.promoPrecio).toFixed(2)}  `;
+    if (calc.lotes   > 0) notaPromoTxt += `${calc.lotes} grupo(s) = $${(calc.lotes * tradicional.promoPrecio).toFixed(2)}  `;
     if (calc.sueltas > 0) notaPromoTxt += `· ${calc.sueltas} unidad(es) = $${(calc.sueltas * tradicional.precioUnidad).toFixed(2)}`;
   }
 
-  /* Página HTML de auditoría (se abre en el navegador) */
+  /* HTML de la página de auditoría */
   const auditHtml = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pedido — Pupusería Ruiz</title>
-<style>
-  body{font-family:Arial,sans-serif;background:#FDF6EC;color:#111;
-       padding:22px;max-width:480px;margin:0 auto}
-  h1{color:#B91C1C;font-size:1.7rem;margin-bottom:3px}
-  .sub{color:#555;font-size:.9rem;margin-bottom:22px}
-  table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:1.1rem}
-  th{background:#B91C1C;color:#fff;padding:11px 13px;text-align:left;font-size:.95rem}
-  td{padding:10px 13px;border-bottom:1px solid #DDD;vertical-align:top}
-  td:last-child{color:#555;white-space:nowrap}
-  .promo{background:#EDE9FE;border-left:4px solid #A78BFA;
-         padding:10px 14px;border-radius:0 8px 8px 0;
-         font-size:1rem;color:#4C1D95;margin-bottom:14px;font-weight:600}
-  .total{background:#B91C1C;color:#fff;border-radius:12px;
-         padding:16px 20px;display:flex;justify-content:space-between;
-         align-items:center;margin-bottom:14px}
-  .total .lbl{font-size:1.1rem;font-weight:700}
-  .total .val{font-size:2.2rem;font-weight:900}
-  .sello{background:#DCFCE7;border:2px solid #86EFAC;border-radius:10px;
-         padding:12px 16px;text-align:center;font-weight:700;
-         color:#14532D;font-size:1rem}
-  .ts{color:#888;font-size:.78rem;text-align:center;margin-top:10px}
-  small{font-size:.82rem;color:#888}
-</style>
-</head>
-<body>
-<h1>🧾 Pedido Verificado</h1>
-<p class="sub">Pupusería Ruiz — Detalle del pedido</p>
-<table>
-/* ─────────────────────────────────────────────────────
-   8. AUDITORÍA Y WHATSAPP (Versión corregida para GitHub)
-───────────────────────────────────────────────────── */
-function buildAuditoria() {
-  const calc = calcularTotal();
-  const { tradicional } = MENU_CONFIG;
-  const pedidoId = Date.now(); // ID único
-  
-  /* Agrupar igual que el drawer */
-  const grupos = new Map();
-  pedido.forEach(p => {
-    const k = p.nombre + '||' + p.masa + '||' + (p.nota || '');
-    if (!grupos.has(k)) grupos.set(k, { nombre: p.nombre, masa: p.masa, nota: p.nota || '', cant: 0 });
-    grupos.get(k).cant++;
-  });
+<html lang="es"><head><meta charset="UTF-8"><title>Pedido — Pupusería Ruiz</title>
+<style>body{font-family:Arial;padding:20px;max-width:480px;margin:0 auto} 
+table{width:100%;border-collapse:collapse;} th{background:#B91C1C;color:#fff;padding:10px;text-align:left}
+td{padding:10px;border-bottom:1px solid #DDD;} .total{font-weight:900;font-size:1.5rem;margin-top:20px;color:#B91C1C;}</style></head>
+<body><h1>🧾 Pedido Verificado</h1>
+<table><thead><tr><th>Cant.</th><th>Pupusa</th><th>Masa</th></tr></thead><tbody>${filasAuditHtml}</tbody></table>
+<div class="total">TOTAL: $${calc.totalMonto.toFixed(2)}</div></body></html>`;
 
-  let filasAuditHtml = '';
-  grupos.forEach(g => {
-    const notaAudit = g.nota ? ` (${g.nota})` : '';
-    filasAuditHtml += `<tr>
-      <td style="font-weight:800;text-align:center;width:44px">${g.cant}</td>
-      <td>${g.nombre}${notaAudit}</td>
-      <td>${g.masa}</td>
-    </tr>`;
-  });
-
-  let notaPromoTxt = '';
-  if (calc.totalTrad > 0) {
-    if (calc.lotes > 0) notaPromoTxt += `${calc.lotes} grupo(s) de ${tradicional.promoQty} = $${(calc.lotes * tradicional.promoPrecio).toFixed(2)}  `;
-    if (calc.sueltas > 0) notaPromoTxt += `· ${calc.sueltas} unidad(es) = $${(calc.sueltas * tradicional.precioUnidad).toFixed(2)}`;
-  }
-
-  /* HTML completo de la auditoría */
-  const auditHtml = `
-  <!DOCTYPE html>
-  <html lang="es">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Pedido — Pupusería Ruiz</title>
-    <style>
-      body{font-family:Arial,sans-serif;background:#FDF6EC;color:#111;padding:20px;max-width:480px;margin:0 auto}
-      table{width:100%;border-collapse:collapse;margin-bottom:20px}
-      th{background:#B91C1C;color:#fff;padding:10px;text-align:left}
-      td{padding:10px;border-bottom:1px solid #DDD}
-      .total{background:#B91C1C;color:#fff;padding:15px;border-radius:10px;text-align:center;font-size:1.5rem;font-weight:900}
-    </style>
-  </head>
-  <body>
-    <h1>🧾 Pedido Recibido</h1>
-    <table>
-      <thead><tr><th>Cant.</th><th>Pupusa</th><th>Masa</th></tr></thead>
-      <tbody>${filasAuditHtml}</tbody>
-    </table>
-    ${notaPromoTxt ? `<p>🌟 ${notaPromoTxt}</p>` : ''}
-    <div class="total">TOTAL: $${calc.totalMonto.toFixed(2)}</div>
-    <p style="text-align:center; color:#888; margin-top:20px;">Fecha: ${new Date().toLocaleString()}</p>
-  </body>
-  </html>`;
-
-  /* Guardamos en localStorage */
+  /* Guardar en localStorage */
   localStorage.setItem('pedido_' + pedidoId, auditHtml);
 
-  /* El link ahora es corto y real */
+  /* Link hacia GitHub Pages */
   const auditUrl = `https://servicios-digitales-es.github.io/pupuseria-ruiz/auditoria.html?id=${pedidoId}`;
   const mensaje = `Ya hice mi pedido a Pupusería Ruiz, por favor míralo aquí: ${auditUrl}`;
 
-  return { mensaje };
+  return { calc, filasModalHtml, notaPromoTxt, mensaje };
 }
 
 /* ─────────────────────────────────────────────────────
-   9. MODAL DE CONFIRMACIÓN (auditoría para el cliente)
+   9. MODAL DE CONFIRMACIÓN
 ───────────────────────────────────────────────────── */
 function abrirModal() {
   if (pedido.length === 0) return;
-  const { calc, filasModalHtml, notaPromoTxt, auditUrl, mensaje } = buildAuditoria();
+  const { calc, filasModalHtml, notaPromoTxt, mensaje } = buildAuditoria();
 
   document.getElementById('modal-body').innerHTML = `
     <table class="audit-tabla">
@@ -608,10 +492,6 @@ function abrirModal() {
     <div class="audit-total">
       <span class="lbl">TOTAL A PAGAR</span>
       <span class="val">$${calc.totalMonto.toFixed(2)}</span>
-    </div>
-    <div class="audit-sello">
-      ✅ El link de auditoría va incluido en el mensaje de WhatsApp
-      para que la pupusera pueda verificar tu pedido.
     </div>`;
 
   _waUrl = `https://wa.me/${MENU_CONFIG.whatsapp}?text=${encodeURIComponent(mensaje)}`;
@@ -627,12 +507,6 @@ function cerrarModal() {
 
 /* ─────────────────────────────────────────────────────
    10. TOAST + BIENVENIDA ANIMADA
-   Secuencia:
-   1. Abre drawer izquierdo 500ms → cierra → parpadea
-      botón "Menú" 2 veces
-   2. Abre drawer derecho 500ms → cierra → parpadea
-      botón "Pedido completo" 2 veces
-   3. Muestra toast centrado durante 3 segundos
 ───────────────────────────────────────────────────── */
 function parpadearBoton(btnEl, veces, intervalo) {
   return new Promise(resolve => {
@@ -656,39 +530,25 @@ function bienvenida() {
   const btnMenu  = document.getElementById('btn-abrir-menu');
   const btnPed   = document.getElementById('btn-abrir-pedido');
 
-  /* 1. Abrir drawer izquierdo */
   setTimeout(() => {
     openDrawerLeft();
-
-    /* 2. Cerrar drawer izquierdo tras 500ms → parpadear botón Menú */
     setTimeout(() => {
       closeDrawerLeft();
-
       parpadearBoton(btnMenu, 2, 200).then(() => {
-
-        /* 3. Abrir drawer derecho */
         setTimeout(() => {
           openDrawerRight();
-
-          /* 4. Cerrar drawer derecho tras 500ms → parpadear botón Pedido */
           setTimeout(() => {
             closeDrawerRight();
-
             parpadearBoton(btnPed, 2, 200).then(() => {
-
-              /* 5. Mostrar toast centrado durante 3 segundos */
               setTimeout(() => {
                 toast.classList.add('show');
                 setTimeout(() => toast.classList.remove('show'), 3000);
               }, 200);
-
             });
           }, 500);
         }, 300);
-
       });
     }, 500);
-
   }, 400);
 }
 
@@ -697,17 +557,14 @@ function bienvenida() {
 ───────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
 
-  /* ── Drawer izquierdo ── */
   document.getElementById('btn-abrir-menu').addEventListener('click', openDrawerLeft);
   document.getElementById('overlay-left').addEventListener('click', closeDrawerLeft);
   document.getElementById('drawer-left-close').addEventListener('click', closeDrawerLeft);
 
-  /* ── Drawer derecho ── */
   document.getElementById('btn-abrir-pedido').addEventListener('click', openDrawerRight);
   document.getElementById('overlay-right').addEventListener('click', closeDrawerRight);
   document.getElementById('drawer-right-close').addEventListener('click', closeDrawerRight);
 
-  /* ── Modal Loca ── */
   document.getElementById('modal-loca-close').addEventListener('click', cerrarModalLoca);
   document.getElementById('btn-loca-cancel').addEventListener('click', cerrarModalLoca);
   document.getElementById('btn-loca-listo').addEventListener('click', confirmarLoca);
@@ -715,7 +572,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === document.getElementById('modal-loca-overlay')) cerrarModalLoca();
   });
 
-  /* ── Modal de confirmación / auditoría ── */
   document.getElementById('modal-close').addEventListener('click', cerrarModal);
   document.getElementById('btn-modal-cancel').addEventListener('click', cerrarModal);
   document.getElementById('modal-overlay').addEventListener('click', e => {
@@ -726,12 +582,8 @@ document.addEventListener('DOMContentLoaded', () => {
     cerrarModal();
   });
 
-  /* ── Render inicial ── */
   renderMenu();
   renderDrawerPedido();
   actualizarBadge();
-
-  /* ── Bienvenida animada ── */
   bienvenida();
 });
-

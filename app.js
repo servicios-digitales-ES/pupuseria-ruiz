@@ -522,24 +522,74 @@ function buildAuditoria() {
 <h1>🧾 Pedido Verificado</h1>
 <p class="sub">Pupusería Ruiz — Detalle del pedido</p>
 <table>
-  <thead><tr><th style="width:44px;text-align:center">Cant.</th><th>Pupusa</th><th>Masa</th></tr></thead>
-  <tbody>${filasAuditHtml}</tbody>
-</table>
-${notaPromoTxt ? `<div class="promo">🌟 Tradicionales: ${notaPromoTxt}</div>` : ''}
-<div class="total">
-  <span class="lbl">TOTAL A PAGAR</span>
-  <span class="val">$${calc.totalMonto.toFixed(2)}</span>
-</div>
-<div class="sello">✅ Generado automáticamente — Pupusería Ruiz</div>
-<p class="ts">${new Date().toLocaleString('es-SV')}</p>
-</body></html>`;
+/* ─────────────────────────────────────────────────────
+   8. AUDITORÍA Y WHATSAPP (Versión corregida para GitHub)
+───────────────────────────────────────────────────── */
+function buildAuditoria() {
+  const calc = calcularTotal();
+  const { tradicional } = MENU_CONFIG;
+  const pedidoId = Date.now(); // ID único
+  
+  /* Agrupar igual que el drawer */
+  const grupos = new Map();
+  pedido.forEach(p => {
+    const k = p.nombre + '||' + p.masa + '||' + (p.nota || '');
+    if (!grupos.has(k)) grupos.set(k, { nombre: p.nombre, masa: p.masa, nota: p.nota || '', cant: 0 });
+    grupos.get(k).cant++;
+  });
 
-  const auditUrl = 'data:text/html;base64,' + btoa(unescape(encodeURIComponent(auditHtml)));
+  let filasAuditHtml = '';
+  grupos.forEach(g => {
+    const notaAudit = g.nota ? ` (${g.nota})` : '';
+    filasAuditHtml += `<tr>
+      <td style="font-weight:800;text-align:center;width:44px">${g.cant}</td>
+      <td>${g.nombre}${notaAudit}</td>
+      <td>${g.masa}</td>
+    </tr>`;
+  });
 
-/* Mensaje exacto de WhatsApp */
+  let notaPromoTxt = '';
+  if (calc.totalTrad > 0) {
+    if (calc.lotes > 0) notaPromoTxt += `${calc.lotes} grupo(s) de ${tradicional.promoQty} = $${(calc.lotes * tradicional.promoPrecio).toFixed(2)}  `;
+    if (calc.sueltas > 0) notaPromoTxt += `· ${calc.sueltas} unidad(es) = $${(calc.sueltas * tradicional.precioUnidad).toFixed(2)}`;
+  }
+
+  /* HTML completo de la auditoría */
+  const auditHtml = `
+  <!DOCTYPE html>
+  <html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Pedido — Pupusería Ruiz</title>
+    <style>
+      body{font-family:Arial,sans-serif;background:#FDF6EC;color:#111;padding:20px;max-width:480px;margin:0 auto}
+      table{width:100%;border-collapse:collapse;margin-bottom:20px}
+      th{background:#B91C1C;color:#fff;padding:10px;text-align:left}
+      td{padding:10px;border-bottom:1px solid #DDD}
+      .total{background:#B91C1C;color:#fff;padding:15px;border-radius:10px;text-align:center;font-size:1.5rem;font-weight:900}
+    </style>
+  </head>
+  <body>
+    <h1>🧾 Pedido Recibido</h1>
+    <table>
+      <thead><tr><th>Cant.</th><th>Pupusa</th><th>Masa</th></tr></thead>
+      <tbody>${filasAuditHtml}</tbody>
+    </table>
+    ${notaPromoTxt ? `<p>🌟 ${notaPromoTxt}</p>` : ''}
+    <div class="total">TOTAL: $${calc.totalMonto.toFixed(2)}</div>
+    <p style="text-align:center; color:#888; margin-top:20px;">Fecha: ${new Date().toLocaleString()}</p>
+  </body>
+  </html>`;
+
+  /* Guardamos en localStorage */
+  localStorage.setItem('pedido_' + pedidoId, auditHtml);
+
+  /* El link ahora es corto y real */
+  const auditUrl = `https://servicios-digitales-es.github.io/pupuseria-ruiz/auditoria.html?id=${pedidoId}`;
   const mensaje = `Ya hice mi pedido a Pupusería Ruiz, por favor míralo aquí: ${auditUrl}`;
 
-  return { calc, filasModalHtml, notaPromoTxt, auditUrl, mensaje };
+  return { mensaje };
 }
 
 /* ─────────────────────────────────────────────────────

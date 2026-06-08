@@ -3,25 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pedido — Pupusería Ruiz</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Ver Pedido</title>
 </head>
 <body>
-  <main style="padding: 20px;">
-    <h1>🧾 Pedido Verificado</h1>
-    <div id="detalle-pedido">Cargando detalles...</div>
-  </main>
+  <div id="contenido-pedido">Cargando pedido...</div>
   <script>
     const params = new URLSearchParams(window.location.search);
-    const pedidoId = params.get('id');
-    const pedidoData = localStorage.getItem('pedido_' + pedidoId);
-    
-    if (pedidoData) {
-      document.getElementById('detalle-pedido').innerHTML = pedidoData;
+    const id = params.get('id');
+    const contenido = localStorage.getItem('pedido_' + id);
+    if (contenido) {
+      document.body.innerHTML = contenido;
     } else {
-      document.getElementById('detalle-pedido').innerHTML = "Pedido no encontrado o expirado.";
+      document.body.innerHTML = "<h1>Error</h1><p>Pedido no encontrado. Intenta de nuevo.</p>";
     }
   </script>
 </body>
 </html>
-

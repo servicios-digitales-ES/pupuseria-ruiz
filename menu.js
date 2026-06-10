@@ -19,16 +19,40 @@ let _productos = [];   // Array de objetos: { ID, Nombre, Tipo, Masa, Precio_uni
  * Llama esto una vez al iniciar la app.
  * @returns {Promise<Array>}
  */
+/* ─────────────────────────────────────────────────────
+   PRODUCTOS DE DEMOSTRACIÓN
+   Se usan cuando el API de Google Sheets no está
+   configurado todavía o no responde.
+   Estructura idéntica a la hoja "productos".
+───────────────────────────────────────────────────── */
+const _PRODUCTOS_DEMO = [
+  { ID: 'trad-1', Nombre: 'Frijol con Queso',      Tipo: 'Tradicional', Masa: 'Maiz/Arroz', Precio_unitario: 0.40 },
+  { ID: 'trad-2', Nombre: 'Revueltas',              Tipo: 'Tradicional', Masa: 'Maiz/Arroz', Precio_unitario: 0.40 },
+  { ID: 'trad-3', Nombre: 'Queso',                  Tipo: 'Tradicional', Masa: 'Maiz/Arroz', Precio_unitario: 0.40 },
+  { ID: 'esp-1',  Nombre: 'Mora',                   Tipo: 'Especial',    Masa: 'Maiz/Arroz', Precio_unitario: 0.75 },
+  { ID: 'esp-2',  Nombre: 'Ajo',                    Tipo: 'Especial',    Masa: 'Maiz/Arroz', Precio_unitario: 0.75 },
+  { ID: 'esp-3',  Nombre: 'Loroco con Queso',       Tipo: 'Especial',    Masa: 'Maiz/Arroz', Precio_unitario: 0.75 },
+  { ID: 'esp-4',  Nombre: 'Chicharrón',             Tipo: 'Especial',    Masa: 'Maiz/Arroz', Precio_unitario: 0.75 },
+  { ID: 'loca-1', Nombre: 'Pupusa Loca',            Tipo: 'Loca',        Masa: 'Maiz/Arroz', Precio_unitario: 3.00 },
+];
+
 async function cargarProductos() {
   try {
     const data = await fetchProductos();
-    // El API puede devolver { productos: [...] } o directamente un array
-    _productos = Array.isArray(data) ? data : (data.productos || []);
+    const lista = Array.isArray(data) ? data : (data.productos || []);
+    if (lista.length > 0) {
+      _productos = lista;
+      return _productos;
+    }
+    // API respondió pero sin productos → usar demo
+    console.warn('API sin productos. Usando datos de demostración.');
+    _productos = _PRODUCTOS_DEMO;
     return _productos;
   } catch (err) {
-    console.error('Error cargando productos:', err);
-    _productos = [];
-    return [];
+    // API no disponible → usar demo silenciosamente
+    console.warn('API no disponible. Usando datos de demostración.', err.message);
+    _productos = _PRODUCTOS_DEMO;
+    return _productos;
   }
 }
 
@@ -106,7 +130,7 @@ async function renderMenu(contenedor, onAgregar) {
   if (_productos.length === 0) {
     contenedor.innerHTML = `
       <div class="menu-error">
-        No se pudo cargar el menú. Verifica tu conexión e intenta de nuevo.
+        No se pudo cargar el menú. Recarga la página e intenta de nuevo.
       </div>`;
     return;
   }
@@ -300,4 +324,4 @@ function actualizarTotal(elTotal, items) {
   const grupos = agruparCarrito(items);
   const total  = calcularTotalCarrito(grupos);
   elTotal.textContent = formatPrecio(total);
-}
+     }

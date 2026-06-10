@@ -1,94 +1,298 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Pupusería Ruiz | Pedidos</title>
-  <link rel="stylesheet" href="style.css"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Pupusería Ruiz | Haz tu pedido</title>
+  <meta name="description" content="Ordena pupusas frescas en línea. Recoge en local o envío a domicilio." />
+
+  <!-- OG / Preview al compartir el link -->
+  <meta property="og:title"       content="Pupusería Ruiz 🫓" />
+  <meta property="og:description" content="Haz tu pedido de pupusas en línea. Fácil y rápido." />
+  <meta property="og:image"       content="https://servicios-digitales-es.github.io/pupuseria-ruiz/og-image.png" />
+  <meta property="og:url"         content="https://servicios-digitales-es.github.io/pupuseria-ruiz/" />
+  <meta property="og:type"        content="website" />
+  <meta name="twitter:card"       content="summary_large_image" />
+
+  <!-- Fuentes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-<div class="overlay overlay-left"  id="overlay-left"></div>
+  <!-- ══════════════════════════════════════════
+       ONBOARDING — se muestra solo la primera vez
+       Controlado por app.js via localStorage
+  ══════════════════════════════════════════ -->
+  <div id="onboarding" class="onboarding" aria-modal="true" role="dialog" aria-label="Guía de uso" hidden>
 
-<div class="overlay overlay-right" id="overlay-right"></div>
-
-<div class="drawer drawer-left" id="drawer-left">
-  <div class="drawer-head">
-    <h2>🧾 Menú</h2>
-    <button class="drawer-close" id="drawer-left-close" aria-label="Cerrar menú">✕</button>
-  </div>
-  <div class="drawer-body" id="drawer-left-body">
-    </div>
-</div>
-
-<div class="drawer drawer-right" id="drawer-right">
-  <div class="drawer-head">
-    <h2>🧺 Pedido completo</h2>
-    <button class="drawer-close" id="drawer-right-close" aria-label="Cerrar pedido">✕</button>
-  </div>
-  <div class="drawer-body" id="drawer-right-body">
-    </div>
-  <div class="drawer-footer" id="drawer-footer">
-    </div>
-</div>
-
-<header>
-  <button class="hdr-btn" id="btn-abrir-menu" aria-label="Ver menú de precios">
-    <span class="hdr-btn-lines"><span></span><span></span><span></span></span>
-    <span class="hdr-btn-label">Menú</span>
-  </button>
-
-  <div class="header-title">
-    <h1>Pupusería Ruiz</h1>
-  </div>
-
-  <button class="hdr-btn hdr-btn-right" id="btn-abrir-pedido" aria-label="Ver pedido completo">
-    <span class="hdr-btn-label">Pedido completo</span>
-    <span class="hdr-badge" id="hdr-badge"></span>
-  </button>
-</header>
-
-<div class="toast" id="toast">
-  Haz tu pedido tocando los botones del ingrediente que desees y eligiendo tu masa 🫓
-</div>
-
-<main>
-  <h2 class="section-title"><span>🫓</span> Elige tu pupusa</h2>
-  <div class="menu-grid" id="menu-grid">
-    </div>
-</main>
-
-<div class="modal-overlay" id="modal-loca-overlay">
-  <div class="modal modal-loca">
-    <div class="modal-head modal-head-loca">
-      <h2>🌶️ Pupusa Loca</h2>
-      <button class="modal-close" id="modal-loca-close" aria-label="Cerrar">✕</button>
-    </div>
-    <div class="modal-body" id="modal-loca-body">
+    <!-- Pantalla de bienvenida -->
+    <div class="ob-screen ob-screen--welcome" id="ob-welcome">
+      <div class="ob-logo">🫓</div>
+      <h1 class="ob-titulo">Bienvenido a<br>Pupusería Ruiz</h1>
+      <p class="ob-subtitulo">Te enseñaremos rápidamente cómo realizar tu pedido.</p>
+      <div class="ob-btns">
+        <button class="btn-ob-primary" id="ob-btn-comenzar">Comenzar</button>
+        <button class="btn-ob-ghost"   id="ob-btn-saltar">Saltar</button>
       </div>
-    <div class="modal-footer">
-      <button class="btn-modal-cancel" id="btn-loca-cancel">Cancelar</button>
-      <button class="btn-modal-listo"  id="btn-loca-listo">✅ ¡Listo!</button>
     </div>
-  </div>
-</div>
 
-<div class="modal-overlay" id="modal-overlay">
-  <div class="modal">
-    <div class="modal-head">
-      <h2>📋 Confirmar Pedido</h2>
-      <button class="modal-close" id="modal-close" aria-label="Cerrar">✕</button>
-    </div>
-    <div class="modal-body" id="modal-body">
+    <!-- Pasos guiados (1-7) -->
+    <div class="ob-screen ob-screen--pasos" id="ob-pasos" hidden>
+      <div class="ob-overlay-spotlight" id="ob-spotlight"></div>
+      <div class="ob-tooltip" id="ob-tooltip">
+        <p class="ob-tooltip-texto" id="ob-tooltip-texto"></p>
+        <div class="ob-tooltip-nav">
+          <span class="ob-step-indicator" id="ob-step-indicator"></span>
+          <button class="btn-ob-primary btn-ob-next" id="ob-btn-next">Siguiente →</button>
+        </div>
       </div>
-    <div class="modal-footer">
-      <button class="btn-modal-cancel" id="btn-modal-cancel">Cancelar</button>
-      <button class="btn-modal-wa"     id="btn-modal-wa">💬 Enviar por WhatsApp</button>
+    </div>
+
+    <!-- Pantalla final -->
+    <div class="ob-screen ob-screen--final" id="ob-final" hidden>
+      <div class="ob-logo">✅</div>
+      <h2 class="ob-titulo">¡Ya estás listo para ordenar!</h2>
+      <button class="btn-ob-primary btn-ob-full" id="ob-btn-finalizar">Comenzar pedido</button>
+    </div>
+
+  </div><!-- /onboarding -->
+
+
+  <!-- ══════════════════════════════════════════
+       HEADER
+  ══════════════════════════════════════════ -->
+  <header class="app-header" id="app-header">
+    <div class="header-inner">
+
+      <div class="header-brand">
+        <span class="header-logo">🫓</span>
+        <span class="header-nombre">Pupusería Ruiz</span>
+      </div>
+
+      <!-- Botón carrito (visible solo en móvil) -->
+      <button class="header-carrito-btn" id="btn-abrir-carrito" aria-label="Ver pedido">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
+        </svg>
+        <span class="header-badge" id="header-badge" hidden>0</span>
+      </button>
+
+    </div>
+  </header>
+
+
+  <!-- ══════════════════════════════════════════
+       LAYOUT PRINCIPAL — 3 columnas desktop / 1 móvil
+  ══════════════════════════════════════════ -->
+  <div class="app-layout">
+
+    <!-- ── COL 1: Menú de pupusas ── -->
+    <section class="col-menu" id="col-menu" aria-label="Menú de pupusas">
+      <div class="col-menu-inner">
+        <h2 class="col-titulo">Elige tu pupusa</h2>
+        <!-- Las cards se insertan aquí por menu.js -->
+        <div class="menu-grid" id="menu-grid"></div>
+      </div>
+    </section>
+
+    <!-- ── COL 2: Detalle de selección activa (desktop) ── -->
+    <section class="col-detalle" id="col-detalle" aria-label="Selección actual" aria-live="polite">
+      <div class="detalle-placeholder" id="detalle-placeholder">
+        <span class="detalle-placeholder-icon">👆</span>
+        <p>Toca una pupusa para elegir la masa</p>
+      </div>
+      <!-- Panel de selección de masa — mostrado por app.js al elegir producto -->
+      <div class="detalle-masa-panel" id="detalle-masa-panel" hidden>
+        <div class="dmp-producto" id="dmp-producto"></div>
+        <p class="dmp-pregunta">¿Qué masa prefieres?</p>
+        <div class="dmp-masas" id="dmp-masas">
+          <button class="btn-masa btn-masa--maiz"  id="btn-masa-maiz"  data-masa="Maíz">
+            <span class="masa-icono">🌽</span>
+            <span class="masa-label">Maíz</span>
+          </button>
+          <button class="btn-masa btn-masa--arroz" id="btn-masa-arroz" data-masa="Arroz">
+            <span class="masa-icono">🌾</span>
+            <span class="masa-label">Arroz</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── COL 3: Resumen del pedido (desktop) / Drawer (móvil) ── -->
+    <aside class="col-carrito" id="col-carrito" aria-label="Tu pedido">
+      <div class="carrito-header">
+        <h2 class="col-titulo">Tu pedido</h2>
+      </div>
+      <!-- Líneas del carrito — renderizadas por app.js -->
+      <div class="carrito-items" id="carrito-items"></div>
+      <!-- Total siempre visible -->
+      <div class="carrito-total" id="carrito-total" hidden>
+        <span class="ct-label">TOTAL</span>
+        <span class="ct-valor" id="ct-valor">$0.00</span>
+      </div>
+      <!-- Botón confirmar pedido -->
+      <div class="carrito-footer" id="carrito-footer">
+        <button class="btn-confirmar" id="btn-confirmar" disabled>
+          Confirmar pedido
+        </button>
+      </div>
+    </aside>
+
+  </div><!-- /app-layout -->
+
+
+  <!-- ══════════════════════════════════════════
+       DRAWER CARRITO — solo móvil
+  ══════════════════════════════════════════ -->
+  <div class="drawer-overlay" id="drawer-overlay" hidden></div>
+  <div class="drawer" id="drawer-carrito" role="dialog" aria-label="Tu pedido" aria-modal="true">
+    <div class="drawer-header">
+      <h2 class="drawer-titulo">Tu pedido</h2>
+      <button class="drawer-close" id="btn-cerrar-carrito" aria-label="Cerrar pedido">✕</button>
+    </div>
+    <div class="drawer-body">
+      <!-- Mismo contenido que col-carrito, sincronizado por app.js -->
+      <div class="carrito-items" id="drawer-carrito-items"></div>
+    </div>
+    <div class="drawer-footer">
+      <div class="carrito-total" id="drawer-carrito-total" hidden>
+        <span class="ct-label">TOTAL</span>
+        <span class="ct-valor" id="drawer-ct-valor">$0.00</span>
+      </div>
+      <button class="btn-confirmar" id="drawer-btn-confirmar" disabled>
+        Confirmar pedido
+      </button>
     </div>
   </div>
-</div>
 
-<script src="menu.js"></script>
-<script src="app.js"></script>
+
+  <!-- ══════════════════════════════════════════
+       MODAL FORMULARIO DE PEDIDO
+  ══════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modal-pedido-overlay" hidden>
+    <div class="modal" id="modal-pedido" role="dialog" aria-label="Completa tu pedido" aria-modal="true">
+
+      <div class="modal-header">
+        <h2 class="modal-titulo">Completa tu pedido</h2>
+        <button class="modal-close" id="modal-pedido-close" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- Resumen rápido -->
+        <div class="modal-resumen" id="modal-resumen"></div>
+
+        <!-- Campos del formulario -->
+        <div class="form-campo">
+          <label class="form-label" for="campo-nombre">Tu nombre <span class="req">*</span></label>
+          <input class="form-input" id="campo-nombre" type="text" placeholder="¿Cómo te llamamos?" autocomplete="given-name" />
+        </div>
+
+        <div class="form-campo">
+          <label class="form-label" for="campo-whatsapp">WhatsApp <span class="form-opcional">(opcional)</span></label>
+          <input class="form-input" id="campo-whatsapp" type="tel" placeholder="Ej: 7654-3210" autocomplete="tel" />
+          <p class="form-hint">Te avisamos cuando tu pedido esté listo.</p>
+        </div>
+
+        <div class="form-campo">
+          <label class="form-label">Tipo de entrega <span class="req">*</span></label>
+          <div class="entrega-opciones" id="entrega-opciones">
+            <button class="btn-entrega" id="btn-entrega-local"     data-valor="ir a pupusería">
+              <span class="entrega-icono">🏠</span>
+              <span class="entrega-texto">Ir a pupusería</span>
+            </button>
+            <button class="btn-entrega" id="btn-entrega-domicilio" data-valor="enviar a domicilio">
+              <span class="entrega-icono">🛵</span>
+              <span class="entrega-texto">Enviar a domicilio</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Campos domicilio — visibilidad controlada por app.js -->
+        <div class="form-domicilio" id="form-domicilio" hidden>
+          <div class="form-campo">
+            <label class="form-label" for="campo-casa">Casa / número <span class="req">*</span></label>
+            <input class="form-input" id="campo-casa" type="text" placeholder="Ej: Casa 12" />
+          </div>
+          <div class="form-campo">
+            <label class="form-label" for="campo-pasaje">Pasaje / calle <span class="req">*</span></label>
+            <input class="form-input" id="campo-pasaje" type="text" placeholder="Ej: Pasaje Los Pinos" />
+          </div>
+          <div class="form-campo">
+            <label class="form-label" for="campo-referencia">Referencia <span class="req">*</span></label>
+            <input class="form-input" id="campo-referencia" type="text" placeholder="Ej: Frente a la farmacia" />
+          </div>
+        </div>
+
+      </div><!-- /modal-body -->
+
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="modal-pedido-cancel">Cancelar</button>
+        <button class="btn-modal-submit" id="modal-pedido-submit" disabled>
+          <span id="submit-texto">Enviar pedido</span>
+          <span id="submit-spinner" class="spinner" hidden></span>
+        </button>
+      </div>
+
+    </div>
+  </div><!-- /modal-pedido-overlay -->
+
+
+  <!-- ══════════════════════════════════════════
+       PANTALLA DE ÉXITO (post-pedido)
+  ══════════════════════════════════════════ -->
+  <div class="pantalla-exito" id="pantalla-exito" hidden>
+    <div class="exito-inner">
+      <div class="exito-icono">✅</div>
+      <h2 class="exito-titulo">¡Pedido enviado!</h2>
+      <p class="exito-subtitulo">Tu pedido fue recibido correctamente.</p>
+
+      <div class="exito-detalle">
+        <div class="exito-fila">
+          <span class="ef-label">Número de pedido</span>
+          <span class="ef-valor" id="exito-num-pedido">—</span>
+        </div>
+        <div class="exito-fila">
+          <span class="ef-label">Fecha</span>
+          <span class="ef-valor" id="exito-fecha">—</span>
+        </div>
+        <div class="exito-fila">
+          <span class="ef-label">Hora</span>
+          <span class="ef-valor" id="exito-hora">—</span>
+        </div>
+        <div class="exito-fila exito-fila--total">
+          <span class="ef-label">Total</span>
+          <span class="ef-valor" id="exito-total">—</span>
+        </div>
+      </div>
+
+      <div class="exito-acciones">
+        <a class="btn-exito-primary" id="btn-ver-estado" href="estado.html">
+          Ver estado de mi pedido
+        </a>
+        <a class="btn-exito-ghost" id="btn-ver-cola" href="cola.html">
+          Ver cola pública
+        </a>
+      </div>
+    </div>
+  </div><!-- /pantalla-exito -->
+
+
+  <!-- ══════════════════════════════════════════
+       TOAST DE RETROALIMENTACIÓN
+  ══════════════════════════════════════════ -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+
+  <!-- Scripts — orden obligatorio -->
+  <script src="config.js"></script>
+  <script src="menu.js"></script>
+  <script src="app.js"></script>
+
 </body>
 </html>

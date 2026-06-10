@@ -1,588 +1,728 @@
 /* ═══════════════════════════════════════════════════════
-   PUPUSERÍA RUIZ — app.js  v4
+   PUPUSERÍA RUIZ — app.js
    -------------------------------------------------------
-   1.  Estado global
-   2.  Drawers: izquierdo (Menú) y derecho (Pedido completo)
-   3.  Render del menú de pupusas
-   4.  Modal de edición de Pupusa Loca
-   5.  Lógica del pedido: agregar, eliminar, calcular
-   6.  Render del drawer-pedido (factura en vivo)
-   7.  Link de auditoría + modal de confirmación
-   8.  WhatsApp: mensaje + link de auditoría
-   9.  Badge, pulso y toast de bienvenida
+   Responsabilidades:
+   1.  Estado global del carrito
+   2.  Render y sincronización del carrito (desktop + drawer)
+   3.  Panel de selección de masa (col-detalle)
+   4.  Modal formulario de pedido
+   5.  Envío del pedido a Google Sheets
+   6.  Pantalla de éxito
+   7.  Onboarding interactivo
+   8.  Animaciones (bounce, glow, float +1, shake)
+   9.  Toast de retroalimentación
    10. Init
+   -------------------------------------------------------
+   Depende de: config.js, menu.js
+   NO hardcodea datos de productos.
 ═══════════════════════════════════════════════════════ */
 
 'use strict';
 
-/* ─────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════
    1. ESTADO GLOBAL
-───────────────────────────────────────────────────── */
-let pedido        = [];   /* array de ítems individuales */
-let itemIdCounter = 0;    /* uid incremental              */
-let _waUrl        = '';   /* URL de WhatsApp pendiente    */
+═══════════════════════════════════════════════════════ */
 
-/* Estado temporal del modal de la Loca */
-let _locaMasa          = '';   /* masa elegida para la Loca pendiente */
-let _locaQuitados      = [];   /* ingredientes desmarcados            */
+/**
+ * Carrito: array plano de ítems.
+ * Cada ítem: { uid, id, nombre, masa, precio_unitario }
+ */
+let carrito      = [];
+let _uidCounter  = 0;
+let _productoSeleccionado = null;  // producto activo en col-detalle
 
-/* ─────────────────────────────────────────────────────
-   2. DRAWERS
-───────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════
+   2. LÓGICA DEL CARRITO
+═══════════════════════════════════════════════════════ */
 
-/* ── Drawer izquierdo: precios ── */
-function buildDrawerMenu() {
-  const { tradicional, precioEspecial, precioLoca } = MENU_CONFIG;
-
-  const especialesItems = ITEMS_PUPUSAS.filter(i => i.tipo === 'especial');
-
-  document.getElementById('drawer-left-body').innerHTML = `
-    <div class="price-section">
-      <div class="price-section-title">⭐ Tradicionales</div>
-      <div class="price-row">
-        <span class="price-name">Frijol con Queso</span>
-        <span class="price-val">$${tradicional.precioUnidad.toFixed(2)}</span>
-      </div>
-      <div class="price-row">
-        <span class="price-name">Revueltas</span>
-        <span class="price-val">$${tradicional.precioUnidad.toFixed(2)}</span>
-      </div>
-      <div class="price-note">
-        $${tradicional.precioUnidad.toFixed(2)} la unidad &nbsp;·&nbsp;
-        <strong>${tradicional.promoQty} por $${tradicional.promoPrecio.toFixed(2)}</strong>
-        (combinables entre sí).
-      </div>
-    </div>
-
-    <div class="price-section">
-      <div class="price-section-title">🫓 Especiales</div>
-      ${especialesItems.map(i => `
-        <div class="price-row">
-          <span class="price-name">${i.nombre}</span>
-          <span class="price-val">$${precioEspecial.toFixed(2)}</span>
-        </div>`).join('')}
-      <div class="price-note">Precio unitario: <strong>$${precioEspecial.toFixed(2)}</strong> c/u.</div>
-    </div>
-
-    <div class="price-section">
-      <div class="price-section-title">🌶️ Pupusa Loca</div>
-      <div class="price-row">
-        <span class="price-name">Pupusa Loca</span>
-        <span class="price-val">$${precioLoca.toFixed(2)}</span>
-      </div>
-      <div class="price-note">
-        Lleva <strong>todos los ingredientes</strong>. Precio fijo:
-        <strong>$${precioLoca.toFixed(2)}</strong>.
-      </div>
-    </div>`;
-}
-
-function openDrawerLeft() {
-  buildDrawerMenu();
-  document.getElementById('drawer-left').classList.add('open');
-  document.getElementById('overlay-left').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeDrawerLeft() {
-  document.getElementById('drawer-left').classList.remove('open');
-  document.getElementById('overlay-left').classList.remove('open');
-  document.body.style.overflow = '';
-}
-
-/* ── Drawer derecho: pedido en vivo ── */
-function openDrawerRight() {
-  renderDrawerPedido();
-  document.getElementById('drawer-right').classList.add('open');
-  document.getElementById('overlay-right').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeDrawerRight() {
-  document.getElementById('drawer-right').classList.remove('open');
-  document.getElementById('overlay-right').classList.remove('open');
-  document.body.style.overflow = '';
-}
-
-/* ─────────────────────────────────────────────────────
-   3. RENDER DEL MENÚ DE PUPUSAS
-───────────────────────────────────────────────────── */
-function renderMenu() {
-  const { tradicional, precioEspecial, precioLoca } = MENU_CONFIG;
-  const grid = document.getElementById('menu-grid');
-  grid.innerHTML = '';
-
-  ITEMS_PUPUSAS.forEach(item => {
-    const card = document.createElement('div');
-
-    /* ── TARJETA TRADICIONAL ── */
-    if (item.tipo === 'tradicional') {
-      card.className = 'pupusa-card card-tradicional';
-      card.innerHTML = `
-        <span class="type-badge badge-tradicional">⭐ Tradicional</span>
-        <div class="card-nombre">${item.nombre}</div>
-        <div class="card-precio">
-          $${tradicional.precioUnidad.toFixed(2)} c/u &nbsp;·&nbsp;
-          ${tradicional.promoQty} por $${tradicional.promoPrecio.toFixed(2)}
-        </div>
-        <div class="card-btns-promo">
-          <div class="masa-row-label">🌽 Maíz</div>
-          <div class="masa-row">
-            <button class="btn-promo btn-promo-3"
-              data-id="${item.id}" data-masa="Maíz" data-modo="promo">
-              $${tradicional.promoPrecio.toFixed(2)}<small>${tradicional.promoQty} juntas</small>
-            </button>
-            <button class="btn-promo btn-promo-1"
-              data-id="${item.id}" data-masa="Maíz" data-modo="unidad">
-              $${tradicional.precioUnidad.toFixed(2)}<small>×1 unidad</small>
-            </button>
-          </div>
-          <div class="masa-row-label">🌾 Arroz</div>
-          <div class="masa-row">
-            <button class="btn-promo btn-promo-3"
-              data-id="${item.id}" data-masa="Arroz" data-modo="promo">
-              $${tradicional.promoPrecio.toFixed(2)}<small>${tradicional.promoQty} juntas</small>
-            </button>
-            <button class="btn-promo btn-promo-1"
-              data-id="${item.id}" data-masa="Arroz" data-modo="unidad">
-              $${tradicional.precioUnidad.toFixed(2)}<small>×1 unidad</small>
-            </button>
-          </div>
-        </div>`;
-
-    /* ── TARJETA ESPECIAL ── */
-    } else if (item.tipo === 'especial') {
-      card.className = 'pupusa-card card-especial';
-      card.innerHTML = `
-        <span class="type-badge badge-especial">🫓 Especial</span>
-        <div class="card-nombre">${item.nombre}</div>
-        <div class="card-precio">$${precioEspecial.toFixed(2)} c/u</div>
-        <div class="card-btns">
-          <button class="btn-masa btn-maiz"  data-id="${item.id}" data-masa="Maíz">
-            🌽 Maíz<small>agregar</small>
-          </button>
-          <button class="btn-masa btn-arroz" data-id="${item.id}" data-masa="Arroz">
-            🌾 Arroz<small>agregar</small>
-          </button>
-        </div>`;
-
-    /* ── TARJETA LOCA ── */
-    } else if (item.tipo === 'loca') {
-      card.className = 'pupusa-card card-loca card-loca-wide';
-      card.innerHTML = `
-        <span class="type-badge badge-loca">🌶️ Pupusa Loca</span>
-        <div class="card-nombre">${item.nombre}</div>
-        <div class="card-precio">$${precioLoca.toFixed(2)} — todos los ingredientes</div>
-        <div class="card-btns">
-          <button class="btn-masa btn-maiz btn-loca-trigger"
-            data-id="${item.id}" data-masa="Maíz">
-            🌽 Maíz<small>personalizar</small>
-          </button>
-          <button class="btn-masa btn-arroz btn-loca-trigger"
-            data-id="${item.id}" data-masa="Arroz">
-            🌾 Arroz<small>personalizar</small>
-          </button>
-        </div>`;
-    }
-
-    grid.appendChild(card);
+/** Agrega un ítem al carrito y dispara UI. */
+function agregarAlCarrito(producto, masa) {
+  carrito.push({
+    uid:             ++_uidCounter,
+    id:              producto.ID,
+    nombre:          producto.Nombre,
+    masa,
+    precio_unitario: parseFloat(producto.Precio_unitario) || 0,
   });
+  _syncCarrito();
+  _animarAgregar(producto.ID, masa);
+}
 
-  /* Event delegation en el grid */
-  grid.addEventListener('click', e => {
-    const btn = e.target.closest('[data-id]');
-    if (!btn) return;
-    const item = ITEMS_PUPUSAS.find(i => i.id === btn.dataset.id);
-    if (!item) return;
+/** Elimina una unidad del carrito (por id + masa). */
+function quitarDelCarrito(id, masa) {
+  const idx = carrito.map(i => i.id + '||' + i.masa).lastIndexOf(id + '||' + masa);
+  if (idx !== -1) {
+    carrito.splice(idx, 1);
+    _syncCarrito();
+  }
+}
 
-    if (item.tipo === 'loca') {
-      /* Abre el modal editor de la Loca */
-      abrirModalLoca(item, btn.dataset.masa);
-    } else if (item.tipo === 'tradicional') {
-      const cant = btn.dataset.modo === 'promo' ? MENU_CONFIG.tradicional.promoQty : 1;
-      agregarPupusa(item, btn.dataset.masa, cant);
+/** Vacía el carrito completo. */
+function vaciarCarrito() {
+  carrito = [];
+  _syncCarrito();
+}
+
+/**
+ * Agrupa los ítems del carrito para renderizar.
+ * @returns {Array<{id,nombre,masa,cant,precio_unitario,subtotal}>}
+ */
+function _agrupar() {
+  const mapa = new Map();
+  carrito.forEach(item => {
+    const k = item.id + '||' + item.masa;
+    if (mapa.has(k)) {
+      const g = mapa.get(k);
+      g.cant++;
+      g.subtotal = +(g.precio_unitario * g.cant).toFixed(2);
     } else {
-      agregarPupusa(item, btn.dataset.masa, 1);
+      mapa.set(k, {
+        id:              item.id,
+        nombre:          item.nombre,
+        masa:            item.masa,
+        cant:            1,
+        precio_unitario: item.precio_unitario,
+        subtotal:        +item.precio_unitario.toFixed(2),
+      });
     }
   });
+  return [...mapa.values()];
 }
 
-/* ─────────────────────────────────────────────────────
-   4. MODAL EDITOR — PUPUSA LOCA
-───────────────────────────────────────────────────── */
-function abrirModalLoca(item, masa) {
-  _locaMasa     = masa;
-  _locaQuitados = [];
-
-  const ingredientes = MENU_CONFIG.ingredientesLoca;
-
-  let chipsHtml = ingredientes.map(ing => `
-    <button class="chip-ing chip-activo" data-ing="${ing}">
-      <span class="chip-check">✓</span> ${ing}
-    </button>`).join('');
-
-  document.getElementById('modal-loca-body').innerHTML = `
-    <p class="loca-instruccion">
-      Toca el ingrediente que <strong>NO</strong> quieres dentro de tu pupusa loca.
-    </p>
-    <p class="loca-masa-info">🌾 Masa elegida: <strong>${masa}</strong></p>
-    <div class="chip-grid" id="chip-grid">
-      ${chipsHtml}
-    </div>
-    <p class="loca-hint">Los ingredientes marcados en verde <strong>SÍ</strong> van incluidos.</p>`;
-
-  /* Listener para chips */
-  document.getElementById('chip-grid').addEventListener('click', e => {
-    const chip = e.target.closest('.chip-ing');
-    if (!chip) return;
-    const ing = chip.dataset.ing;
-    if (chip.classList.contains('chip-activo')) {
-      chip.classList.remove('chip-activo');
-      chip.classList.add('chip-quitado');
-      chip.querySelector('.chip-check').textContent = '✕';
-      if (!_locaQuitados.includes(ing)) _locaQuitados.push(ing);
-    } else {
-      chip.classList.add('chip-activo');
-      chip.classList.remove('chip-quitado');
-      chip.querySelector('.chip-check').textContent = '✓';
-      _locaQuitados = _locaQuitados.filter(x => x !== ing);
-    }
-  });
-
-  document.getElementById('modal-loca-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
+/** Calcula el total del carrito. */
+function _calcularTotal() {
+  return +_agrupar().reduce((acc, g) => acc + g.subtotal, 0).toFixed(2);
 }
 
-function cerrarModalLoca() {
-  document.getElementById('modal-loca-overlay').classList.remove('open');
-  document.body.style.overflow = '';
-  _locaMasa     = '';
-  _locaQuitados = [];
-}
+/** Sincroniza carrito en desktop, drawer, badge y botones confirmar. */
+function _syncCarrito() {
+  const grupos = _agrupar();
+  const total  = _calcularTotal();
+  const hayItems = carrito.length > 0;
 
-function confirmarLoca() {
-  if (!_locaMasa) return;
+  _renderLineas(document.getElementById('carrito-items'),       grupos);
+  _renderLineas(document.getElementById('drawer-carrito-items'), grupos);
 
-  const item = ITEMS_PUPUSAS.find(i => i.id === 'loca');
-
-  /* Nota: "Sin: X, Y" o "Todo incluido" */
-  const nota = _locaQuitados.length > 0
-    ? `Sin: ${_locaQuitados.join(', ')}`
-    : 'Todo incluido';
-
-  pedido.push({
-    uid:    ++itemIdCounter,
-    id:     item.id,
-    nombre: item.nombre,
-    nota,
-    masa:   _locaMasa,
-    tipo:   'loca',
-  });
-
-  if (document.getElementById('drawer-right').classList.contains('open')) {
-    renderDrawerPedido();
+  // Total desktop
+  const elTotal   = document.getElementById('carrito-total');
+  const elValor   = document.getElementById('ct-valor');
+  if (elTotal && elValor) {
+    elTotal.hidden = !hayItems;
+    elValor.textContent = formatPrecio(total);
   }
-  actualizarBadge();
-  pulsarBotonPedido();
-  cerrarModalLoca();
-}
 
-/* ─────────────────────────────────────────────────────
-   5. LÓGICA DEL PEDIDO
-───────────────────────────────────────────────────── */
-function agregarPupusa(item, masa, cantidad) {
-  for (let i = 0; i < cantidad; i++) {
-    pedido.push({
-      uid:    ++itemIdCounter,
-      id:     item.id,
-      nombre: item.nombre,
-      nota:   '',
-      masa,
-      tipo:   item.tipo,
-    });
+  // Total drawer
+  const elTotalD  = document.getElementById('drawer-carrito-total');
+  const elValorD  = document.getElementById('drawer-ct-valor');
+  if (elTotalD && elValorD) {
+    elTotalD.hidden = !hayItems;
+    elValorD.textContent = formatPrecio(total);
   }
-  if (document.getElementById('drawer-right').classList.contains('open')) {
-    renderDrawerPedido();
-  }
-  actualizarBadge();
-  pulsarBotonPedido();
+
+  // Botones confirmar
+  [
+    document.getElementById('btn-confirmar'),
+    document.getElementById('drawer-btn-confirmar'),
+  ].forEach(btn => { if (btn) btn.disabled = !hayItems; });
+
+  // Badge header móvil
+  _actualizarBadge();
 }
 
-function eliminarUno(nombre, masa, nota) {
-  /* Elimina la última coincidencia de nombre+masa+nota */
-  for (let i = pedido.length - 1; i >= 0; i--) {
-    if (pedido[i].nombre === nombre && pedido[i].masa === masa && (pedido[i].nota || '') === nota) {
-      pedido.splice(i, 1);
-      break;
-    }
-  }
-  renderDrawerPedido();
-  actualizarBadge();
-}
+/** Renderiza las líneas del carrito en un contenedor. */
+function _renderLineas(contenedor, grupos) {
+  if (!contenedor) return;
 
-function calcularTotal() {
-  const { tradicional, precioEspecial, precioLoca } = MENU_CONFIG;
-
-  const tradicionales = pedido.filter(p => p.tipo === 'tradicional');
-  const especiales    = pedido.filter(p => p.tipo === 'especial');
-  const locas         = pedido.filter(p => p.tipo === 'loca');
-
-  const totalTrad = tradicionales.length;
-  const lotes     = Math.floor(totalTrad / tradicional.promoQty);
-  const sueltas   = totalTrad % tradicional.promoQty;
-
-  const totalMonto =
-    lotes   * tradicional.promoPrecio +
-    sueltas * tradicional.precioUnidad +
-    especiales.length * precioEspecial +
-    locas.length      * precioLoca;
-
-  return { totalMonto, lotes, sueltas, totalTrad };
-}
-
-/* ─────────────────────────────────────────────────────
-   6. RENDER DEL DRAWER DERECHO (pedido en vivo)
-───────────────────────────────────────────────────── */
-function renderDrawerPedido() {
-  const body   = document.getElementById('drawer-right-body');
-  const footer = document.getElementById('drawer-footer');
-
-  if (pedido.length === 0) {
-    body.innerHTML = `
-      <div class="ped-vacio">
-        <span class="icon">🧺</span>
-        Aún no hay pupusas.<br>¡Toca Maíz o Arroz en el menú para empezar!
+  if (grupos.length === 0) {
+    contenedor.innerHTML = `
+      <div class="carrito-vacio">
+        <span class="carrito-vacio__icono">🧺</span>
+        <p>Aún no hay pupusas.</p>
+        <p class="carrito-vacio__hint">Toca <strong>Maíz</strong> o <strong>Arroz</strong> para empezar.</p>
       </div>`;
-    footer.innerHTML = `
-      <button class="btn-generar" disabled>💬 Generar Pedido</button>`;
     return;
   }
 
-  /* Agrupar por nombre + masa + nota */
-  const grupos = new Map();
-  pedido.forEach(p => {
-    const k = p.nombre + '||' + p.masa + '||' + (p.nota || '');
-    if (!grupos.has(k)) grupos.set(k, { nombre: p.nombre, masa: p.masa, nota: p.nota || '', cant: 0 });
-    grupos.get(k).cant++;
-  });
-
-  let lineasHtml = '';
-  grupos.forEach(g => {
-    const notaHtml = g.nota ? `<div class="pl-nota">${g.nota}</div>` : '';
-    const cantHtml = g.cant > 1 ? `<span class="pl-cant">${g.cant}</span>` : '';
-    const dNota    = (g.nota || '').replace(/"/g, '&quot;');
-    lineasHtml += `
-      <div class="ped-linea">
-        ${cantHtml}
-        <div class="pl-info">
-          <div class="pl-nombre">${g.nombre}</div>
-          <div class="pl-masa">${g.masa}</div>
-          ${notaHtml}
-        </div>
-        <button class="pl-del"
-          data-nombre="${g.nombre}"
-          data-masa="${g.masa}"
-          data-nota="${dNota}"
-          title="Quitar uno">−</button>
-      </div>`;
-  });
-
-  const calc = calcularTotal();
-
-  /* Nota de promo solo si hay tradicionales */
-  let notaPromoHtml = '';
-  if (calc.totalTrad > 0) {
-    const { tradicional } = MENU_CONFIG;
-    let t = '';
-    if (calc.lotes   > 0) t += `${calc.lotes} grupo(s) de ${tradicional.promoQty} = $${(calc.lotes * tradicional.promoPrecio).toFixed(2)}`;
-    if (calc.sueltas > 0) t += `${t ? '  ·  ' : ''}${calc.sueltas} unidad(es) = $${(calc.sueltas * tradicional.precioUnidad).toFixed(2)}`;
-    notaPromoHtml = `<div class="ped-promo-nota show">🌟 Tradicionales: ${t}</div>`;
-  }
-
-  body.innerHTML = lineasHtml + notaPromoHtml;
-
-  body.querySelectorAll('.pl-del').forEach(btn => {
-    btn.addEventListener('click', () =>
-      eliminarUno(btn.dataset.nombre, btn.dataset.masa, btn.dataset.nota || ''));
-  });
-
-  footer.innerHTML = `
-    <div class="ped-total">
-      <span class="ped-total-label">TOTAL</span>
-      <span class="ped-total-val">$${calc.totalMonto.toFixed(2)}</span>
+  contenedor.innerHTML = grupos.map(g => `
+    <div class="carrito-linea" data-id="${g.id}" data-masa="${g.masa}">
+      <div class="cl-info">
+        <span class="cl-nombre">${g.nombre}</span>
+        <span class="cl-masa">${_iconoMasa(g.masa)} ${g.masa}</span>
+      </div>
+      <div class="cl-controles">
+        <button class="cl-btn cl-btn--quitar"
+          data-id="${g.id}" data-masa="${g.masa}"
+          aria-label="Quitar una ${g.nombre}">−</button>
+        <span class="cl-cant">${g.cant}</span>
+        <span class="cl-subtotal">${formatPrecio(g.subtotal)}</span>
+      </div>
     </div>
-    <button class="btn-generar" id="btn-generar-inner">💬 Generar Pedido</button>`;
+  `).join('');
 
-  document.getElementById('btn-generar-inner')
-    .addEventListener('click', () => { closeDrawerRight(); abrirModal(); });
+  contenedor.querySelectorAll('.cl-btn--quitar').forEach(btn => {
+    btn.addEventListener('click', () => quitarDelCarrito(btn.dataset.id, btn.dataset.masa));
+  });
 }
 
-/* ─────────────────────────────────────────────────────
-   7. AUDITORÍA Y WHATSAPP
-───────────────────────────────────────────────────── */
-function buildAuditoria() {
-  const calc = calcularTotal();
-  const pedidoId = Date.now();
-  const { tradicional } = MENU_CONFIG;
-
-  const grupos = new Map();
-  pedido.forEach(p => {
-    const k = p.nombre + '||' + p.masa + '||' + (p.nota || '');
-    if (!grupos.has(k)) grupos.set(k, { nombre: p.nombre, masa: p.masa, nota: p.nota || '', cant: 0 });
-    grupos.get(k).cant++;
-  });
-
-  let filasModalHtml = '';
-  let filasAuditHtml = '';
-
-  grupos.forEach(g => {
-    const notaTd    = g.nota ? `<br><small style="color:#888">${g.nota}</small>` : '';
-    const notaAudit = g.nota ? ` (${g.nota})` : '';
-
-    filasModalHtml += `<tr>
-      <td class="at-cant">${g.cant}</td>
-      <td class="at-nombre">${g.nombre}${notaTd}</td>
-      <td class="at-masa">${g.masa}</td>
-    </tr>`;
-
-    filasAuditHtml += `<tr>
-      <td style="font-weight:800;text-align:center;width:44px">${g.cant}</td>
-      <td>${g.nombre}${notaAudit}</td>
-      <td>${g.masa}</td>
-    </tr>`;
-  });
-
-  let notaPromoTxt = '';
-  if (calc.totalTrad > 0) {
-    if (calc.lotes > 0) notaPromoTxt += `${calc.lotes} grupo(s) = $${(calc.lotes * tradicional.promoPrecio).toFixed(2)}  `;
-    if (calc.sueltas > 0) notaPromoTxt += `· ${calc.sueltas} unidad(es) = $${(calc.sueltas * tradicional.precioUnidad).toFixed(2)}`;
-  }
-
-  /* HTML completo de la página de auditoría */
-  const auditHtml = `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>Pedido — Pupusería Ruiz</title>
-<style>body{font-family:Arial;padding:20px;max-width:480px;margin:0 auto} 
-table{width:100%;border-collapse:collapse;} th{background:#B91C1C;color:#fff;padding:10px;text-align:left}
-td{padding:10px;border-bottom:1px solid #DDD;} .total{font-weight:900;font-size:1.5rem;margin-top:20px;color:#B91C1C;}</style></head>
-<body><h1>🧾 Pedido Verificado</h1>
-<table><thead><tr><th>Cant.</th><th>Pupusa</th><th>Masa</th></tr></thead><tbody>${filasAuditHtml}</tbody></table>
-<div class="total">TOTAL: $${calc.totalMonto.toFixed(2)}</div></body></html>`;
-
-  localStorage.setItem('pedido_' + pedidoId, auditHtml);
-
-  const auditUrl = `https://servicios-digitales-es.github.io/pupuseria-ruiz/auditoria.html?id=${pedidoId}`;
-  const mensaje = `Ya hice mi pedido a Pupusería Ruiz, por favor míralo aquí: ${auditUrl}`;
-
-  return { calc, filasModalHtml, notaPromoTxt, mensaje };
+/** Actualiza el badge del header móvil. */
+function _actualizarBadge() {
+  const badge = document.getElementById('header-badge');
+  if (!badge) return;
+  const n = carrito.length;
+  badge.textContent = n;
+  badge.hidden      = n === 0;
 }
 
+function _iconoMasa(masa) {
+  if (masa === 'Maíz')  return '🌽';
+  if (masa === 'Arroz') return '🌾';
+  return '🫓';
+}
 
-/* ─────────────────────────────────────────────────────
-   9. MODAL DE CONFIRMACIÓN
-───────────────────────────────────────────────────── */
-function abrirModal() {
-  if (pedido.length === 0) return;
-  const { calc, filasModalHtml, notaPromoTxt, mensaje } = buildAuditoria();
+/* ═══════════════════════════════════════════════════════
+   3. PANEL DE SELECCIÓN DE MASA (col-detalle, solo desktop)
+═══════════════════════════════════════════════════════ */
 
-  document.getElementById('modal-body').innerHTML = `
-    <table class="audit-tabla">
-      <thead><tr><th>Cant.</th><th>Pupusa</th><th>Masa</th></tr></thead>
-      <tbody>${filasModalHtml}</tbody>
-    </table>
-    ${notaPromoTxt ? `<div class="audit-promo">🌟 Tradicionales: ${notaPromoTxt}</div>` : ''}
-    <div class="audit-total">
-      <span class="lbl">TOTAL A PAGAR</span>
-      <span class="val">$${calc.totalMonto.toFixed(2)}</span>
-    </div>`;
+/** Muestra el panel de selección de masa para un producto. */
+function mostrarPanelMasa(producto) {
+  _productoSeleccionado = producto;
 
-  _waUrl = `https://wa.me/${MENU_CONFIG.whatsapp}?text=${encodeURIComponent(mensaje)}`;
+  const placeholder = document.getElementById('detalle-placeholder');
+  const panel       = document.getElementById('detalle-masa-panel');
+  const elNombre    = document.getElementById('dmp-producto');
 
-  document.getElementById('modal-overlay').classList.add('open');
+  if (!panel) return;
+
+  if (placeholder) placeholder.hidden = true;
+  panel.hidden = false;
+
+  elNombre.innerHTML = `
+    <span class="dmp-nombre">${producto.Nombre}</span>
+    <div class="dmp-precio">${formatPrecio(producto.Precio_unitario)}</div>`;
+
+  // Resaltar el último botón activo si aplica
+  document.querySelectorAll('#dmp-masas .btn-masa').forEach(b => b.classList.remove('active'));
+}
+
+/** Oculta el panel y muestra el placeholder. */
+function ocultarPanelMasa() {
+  _productoSeleccionado = null;
+  const placeholder = document.getElementById('detalle-placeholder');
+  const panel       = document.getElementById('detalle-masa-panel');
+  if (placeholder) placeholder.hidden = false;
+  if (panel)       panel.hidden = true;
+}
+
+/* ═══════════════════════════════════════════════════════
+   4. DRAWER CARRITO (móvil)
+═══════════════════════════════════════════════════════ */
+
+function abrirDrawer() {
+  const drawer  = document.getElementById('drawer-carrito');
+  const overlay = document.getElementById('drawer-overlay');
+  if (!drawer) return;
+  overlay.hidden = false;
+  drawer.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
 
+function cerrarDrawer() {
+  const drawer  = document.getElementById('drawer-carrito');
+  const overlay = document.getElementById('drawer-overlay');
+  if (!drawer) return;
+  drawer.classList.remove('open');
+  setTimeout(() => {
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+  }, 300);
+}
+
+/* ═══════════════════════════════════════════════════════
+   5. MODAL FORMULARIO DE PEDIDO
+═══════════════════════════════════════════════════════ */
+
+let _tipoEntregaSeleccionada = '';
+
+function abrirModal() {
+  if (carrito.length === 0) return;
+
+  // Llenar resumen del modal
+  _renderResumenModal();
+
+  // Limpiar estado anterior
+  _tipoEntregaSeleccionada = '';
+  document.getElementById('campo-nombre').value    = '';
+  document.getElementById('campo-whatsapp').value  = '';
+  document.getElementById('campo-casa').value      = '';
+  document.getElementById('campo-pasaje').value    = '';
+  document.getElementById('campo-referencia').value = '';
+  document.getElementById('form-domicilio').hidden  = true;
+  document.querySelectorAll('.btn-entrega').forEach(b => b.classList.remove('selected'));
+  document.getElementById('modal-pedido-submit').disabled = true;
+
+  // Mostrar modal
+  const overlay = document.getElementById('modal-pedido-overlay');
+  overlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+
+  // Focus primer campo
+  setTimeout(() => document.getElementById('campo-nombre').focus(), 50);
+}
+
 function cerrarModal() {
-  document.getElementById('modal-overlay').classList.remove('open');
+  document.getElementById('modal-pedido-overlay').hidden = true;
   document.body.style.overflow = '';
 }
 
-/* ─────────────────────────────────────────────────────
-   10. TOAST + BIENVENIDA ANIMADA
-───────────────────────────────────────────────────── */
-function parpadearBoton(btnEl, veces, intervalo) {
-  return new Promise(resolve => {
-    let count = 0;
-    const tick = () => {
-      btnEl.classList.toggle('blink-on');
-      count++;
-      if (count < veces * 2) {
-        setTimeout(tick, intervalo);
-      } else {
-        btnEl.classList.remove('blink-on');
-        resolve();
-      }
-    };
-    setTimeout(tick, 80);
-  });
+function _renderResumenModal() {
+  const grupos = _agrupar();
+  const total  = _calcularTotal();
+  const el     = document.getElementById('modal-resumen');
+  if (!el) return;
+
+  el.innerHTML = `
+    ${grupos.map(g => `
+      <div class="mr-linea">
+        <span>${g.cant} × ${g.nombre} <small>(${g.masa})</small></span>
+        <span>${formatPrecio(g.subtotal)}</span>
+      </div>`).join('')}
+    <div class="mr-total">
+      <span class="mr-total-label">Total</span>
+      <span class="mr-total-valor">${formatPrecio(total)}</span>
+    </div>`;
 }
 
-function bienvenida() {
-  const toast   = document.getElementById('toast');
-  const btnMenu  = document.getElementById('btn-abrir-menu');
-  const btnPed   = document.getElementById('btn-abrir-pedido');
+/** Valida el formulario y habilita/deshabilita el botón enviar. */
+function _validarFormulario() {
+  const nombre   = document.getElementById('campo-nombre').value.trim();
+  const entrega  = _tipoEntregaSeleccionada;
+  let ok = nombre.length > 0 && entrega !== '';
 
-  setTimeout(() => {
-    openDrawerLeft();
-    setTimeout(() => {
-      closeDrawerLeft();
-      parpadearBoton(btnMenu, 2, 200).then(() => {
-        setTimeout(() => {
-          openDrawerRight();
-          setTimeout(() => {
-            closeDrawerRight();
-            parpadearBoton(btnPed, 2, 200).then(() => {
-              setTimeout(() => {
-                toast.classList.add('show');
-                setTimeout(() => toast.classList.remove('show'), 3000);
-              }, 200);
-            });
-          }, 500);
-        }, 300);
-      });
-    }, 500);
-  }, 400);
+  if (entrega === ENTREGA.DOMICILIO) {
+    const casa      = document.getElementById('campo-casa').value.trim();
+    const pasaje    = document.getElementById('campo-pasaje').value.trim();
+    const referencia = document.getElementById('campo-referencia').value.trim();
+    ok = ok && casa !== '' && pasaje !== '' && referencia !== '';
+  }
+
+  document.getElementById('modal-pedido-submit').disabled = !ok;
 }
 
-/* ─────────────────────────────────────────────────────
-   11. INIT
-───────────────────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
+/* ═══════════════════════════════════════════════════════
+   6. ENVÍO DEL PEDIDO
+═══════════════════════════════════════════════════════ */
 
-  document.getElementById('btn-abrir-menu').addEventListener('click', openDrawerLeft);
-  document.getElementById('overlay-left').addEventListener('click', closeDrawerLeft);
-  document.getElementById('drawer-left-close').addEventListener('click', closeDrawerLeft);
+async function enviarPedidoCompleto() {
+  const nombre     = document.getElementById('campo-nombre').value.trim();
+  const whatsapp   = document.getElementById('campo-whatsapp').value.trim();
+  const entrega    = _tipoEntregaSeleccionada;
+  const casa       = document.getElementById('campo-casa').value.trim();
+  const pasaje     = document.getElementById('campo-pasaje').value.trim();
+  const referencia = document.getElementById('campo-referencia').value.trim();
 
-  document.getElementById('btn-abrir-pedido').addEventListener('click', openDrawerRight);
-  document.getElementById('overlay-right').addEventListener('click', closeDrawerRight);
-  document.getElementById('drawer-right-close').addEventListener('click', closeDrawerRight);
+  // UI: mostrar spinner
+  document.getElementById('submit-texto').hidden  = true;
+  document.getElementById('submit-spinner').hidden = false;
+  document.getElementById('modal-pedido-submit').disabled = true;
 
-  document.getElementById('modal-loca-close').addEventListener('click', cerrarModalLoca);
-  document.getElementById('btn-loca-cancel').addEventListener('click', cerrarModalLoca);
-  document.getElementById('btn-loca-listo').addEventListener('click', confirmarLoca);
-  document.getElementById('modal-loca-overlay').addEventListener('click', e => {
-    if (e.target === document.getElementById('modal-loca-overlay')) cerrarModalLoca();
-  });
+  // Construir payload
+  const grupos = _agrupar();
+  const payload = {
+    nombre_cliente: nombre,
+    tipo_entrega:   entrega,
+    casa:           entrega === ENTREGA.DOMICILIO ? casa      : '',
+    pasaje:         entrega === ENTREGA.DOMICILIO ? pasaje    : '',
+    referencia:     entrega === ENTREGA.DOMICILIO ? referencia : '',
+    whatsapp:       whatsapp,
+    estado:         ESTADOS.ENVIADO,
+    items:          grupos.map(g => ({
+      producto:        g.nombre,
+      masa:            g.masa,
+      cantidad:        g.cant,
+      precio_unitario: g.precio_unitario,
+      subtotal:        g.subtotal,
+    })),
+    total: _calcularTotal(),
+  };
 
-  document.getElementById('modal-close').addEventListener('click', cerrarModal);
-  document.getElementById('btn-modal-cancel').addEventListener('click', cerrarModal);
-  document.getElementById('modal-overlay').addEventListener('click', e => {
-    if (e.target === document.getElementById('modal-overlay')) cerrarModal();
-  });
-  document.getElementById('btn-modal-wa').addEventListener('click', () => {
-    window.open(_waUrl, '_blank');
+  try {
+    const respuesta = await enviarPedido(payload);
+
+    // Guardar ID en localStorage para estado.html
+    const idPedido = respuesta.id || respuesta.ID_pedido || respuesta.pedido_id || '';
+    if (idPedido) lsSet(LS.ULTIMO_ID, idPedido);
+
     cerrarModal();
+    cerrarDrawer();
+    _mostrarExito({ idPedido, total: payload.total });
+    vaciarCarrito();
+
+  } catch (err) {
+    console.error('Error enviando pedido:', err);
+    mostrarToast('Hubo un problema al enviar tu pedido. Inténtalo de nuevo.', 'error');
+
+    // Restaurar botón
+    document.getElementById('submit-texto').hidden  = false;
+    document.getElementById('submit-spinner').hidden = true;
+    document.getElementById('modal-pedido-submit').disabled = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   7. PANTALLA DE ÉXITO
+═══════════════════════════════════════════════════════ */
+
+function _mostrarExito({ idPedido, total }) {
+  const ahora = new Date();
+
+  document.getElementById('exito-num-pedido').textContent = idPedido ? `#${idPedido}` : '—';
+  document.getElementById('exito-fecha').textContent      = formatFecha();
+  document.getElementById('exito-hora').textContent       = formatHora();
+  document.getElementById('exito-total').textContent      = formatPrecio(total);
+
+  // Actualizar href del botón "Ver estado"
+  const btnEstado = document.getElementById('btn-ver-estado');
+  if (btnEstado && idPedido) {
+    btnEstado.href = `estado.html?id=${idPedido}`;
+  }
+
+  document.getElementById('pantalla-exito').hidden = false;
+  document.body.style.overflow = 'hidden';
+  window.scrollTo(0, 0);
+}
+
+/* ═══════════════════════════════════════════════════════
+   8. ANIMACIONES
+═══════════════════════════════════════════════════════ */
+
+/**
+ * Dispara bounce en el botón de masa, float +1 y glow en la card,
+ * y shake en el carrito.
+ */
+function _animarAgregar(productoId, masa) {
+  // 1. Bounce en el botón de masa pulsado
+  const slugM = masa === 'Maíz' ? 'maiz' : 'arroz';
+  const cards = document.querySelectorAll(`.pupusa-card[data-id="${productoId}"]`);
+  cards.forEach(card => {
+    const btn = card.querySelector(`.btn-masa--${slugM}`);
+    if (btn) {
+      btn.classList.remove('btn-bounce');
+      void btn.offsetWidth; // reflow para reiniciar animación
+      btn.classList.add('btn-bounce');
+      btn.addEventListener('animationend', () => btn.classList.remove('btn-bounce'), { once: true });
+    }
+
+    // 3. Glow en la card
+    card.classList.remove('card-glow');
+    void card.offsetWidth;
+    card.classList.add('card-glow');
+    card.addEventListener('animationend', () => card.classList.remove('card-glow'), { once: true });
+
+    // 2. Float +1 sobre el botón
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      const el   = document.createElement('span');
+      el.className     = 'float-plus';
+      el.textContent   = '+1';
+      el.style.left    = `${rect.left + rect.width / 2 - 16}px`;
+      el.style.top     = `${rect.top + window.scrollY - 10}px`;
+      document.body.appendChild(el);
+      el.addEventListener('animationend', () => el.remove(), { once: true });
+    }
   });
 
-  renderMenu();
-  renderDrawerPedido();
-  actualizarBadge();
-  bienvenida();
+  // 4. Shake en el carrito (desktop y drawer)
+  [
+    document.getElementById('col-carrito'),
+    document.getElementById('drawer-carrito'),
+  ].forEach(el => {
+    if (!el) return;
+    el.classList.remove('cart-shake');
+    void el.offsetWidth;
+    el.classList.add('cart-shake');
+    el.addEventListener('animationend', () => el.classList.remove('cart-shake'), { once: true });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════
+   9. TOAST
+═══════════════════════════════════════════════════════ */
+
+let _toastTimer = null;
+
+/**
+ * Muestra un mensaje toast temporal.
+ * @param {string} mensaje
+ * @param {'info'|'success'|'error'} tipo
+ * @param {number} duracion ms
+ */
+function mostrarToast(mensaje, tipo = 'info', duracion = 3000) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+
+  toast.textContent = mensaje;
+  toast.className   = 'toast show';
+  if (tipo === 'success') toast.classList.add('toast--success');
+  if (tipo === 'error')   toast.classList.add('toast--error');
+
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => {
+    toast.classList.remove('show');
+  }, duracion);
+}
+
+/* ═══════════════════════════════════════════════════════
+   10. ONBOARDING
+═══════════════════════════════════════════════════════ */
+
+const _OB_PASOS = [
+  {
+    texto:  'Aquí puedes ver todas nuestras pupusas disponibles. Toca una para elegirla.',
+    target: '#menu-grid',
+    pos:    'bottom',
+  },
+  {
+    texto:  'Cada pupusa puede pedirse en masa de maíz 🌽 o arroz 🌾. Toca la que prefieras.',
+    target: '#col-detalle',
+    pos:    'left',
+  },
+  {
+    texto:  'Toca "Maíz" o "Arroz" en cualquier tarjeta para agregar la pupusa a tu pedido.',
+    target: '.card-masas',
+    pos:    'bottom',
+  },
+  {
+    texto:  'Aquí aparece tu pedido en tiempo real. Puedes quitar ítems con el botón −.',
+    target: '#col-carrito',
+    pos:    'left',
+  },
+  {
+    texto:  'Cuando estés listo, toca "Confirmar pedido". Podrás elegir recoger en local o envío a domicilio.',
+    target: '#btn-confirmar',
+    pos:    'top',
+  },
+  {
+    texto:  'Después de enviar recibirás un número de pedido para consultar el estado en tiempo real.',
+    target: '#app-header',
+    pos:    'bottom',
+  },
+  {
+    texto:  'La cola pública muestra los pedidos en preparación. No se muestran datos personales.',
+    target: '#app-header',
+    pos:    'bottom',
+  },
+];
+
+let _obPasoActual = 0;
+
+function _mostrarOnboarding() {
+  if (lsGet(LS.ONBOARDING) === 'true') return; // ya visto
+  const el = document.getElementById('onboarding');
+  if (el) el.hidden = false;
+}
+
+function _cerrarOnboarding() {
+  const el = document.getElementById('onboarding');
+  if (el) el.hidden = true;
+  lsSet(LS.ONBOARDING, 'true');
+}
+
+function _iniciarPasos() {
+  document.getElementById('ob-welcome').hidden = true;
+  document.getElementById('ob-pasos').hidden   = false;
+  _obPasoActual = 0;
+  _mostrarPasoOb(_obPasoActual);
+}
+
+function _mostrarPasoOb(idx) {
+  const paso      = _OB_PASOS[idx];
+  const total     = _OB_PASOS.length;
+  const tooltip   = document.getElementById('ob-tooltip');
+  const texto     = document.getElementById('ob-tooltip-texto');
+  const indicator = document.getElementById('ob-step-indicator');
+  const nextBtn   = document.getElementById('ob-btn-next');
+  const spotlight = document.getElementById('ob-spotlight');
+
+  texto.textContent      = paso.texto;
+  indicator.textContent  = `${idx + 1} / ${total}`;
+  nextBtn.textContent    = idx < total - 1 ? 'Siguiente →' : 'Ver resumen';
+
+  // Spotlight: intentar resaltar el target
+  const target = document.querySelector(paso.target);
+  if (target && spotlight) {
+    const rect = target.getBoundingClientRect();
+    const pad  = 8;
+    const x1   = Math.max(0, rect.left   - pad);
+    const y1   = Math.max(0, rect.top    - pad);
+    const x2   = Math.min(window.innerWidth,  rect.right  + pad);
+    const y2   = Math.min(window.innerHeight, rect.bottom + pad);
+
+    spotlight.style.clipPath =
+      `polygon(0 0, 100% 0, 100% 100%, 0 100%,` +
+      `0 ${y1}px, ${x1}px ${y1}px, ${x1}px ${y2}px, ${x2}px ${y2}px,` +
+      `${x2}px ${y1}px, 0 ${y1}px)`;
+
+    // Posicionar tooltip cerca del target
+    _posicionarTooltip(tooltip, rect, paso.pos);
+  } else {
+    // Sin target: centrar tooltip
+    if (spotlight) spotlight.style.clipPath = 'none';
+    if (tooltip) {
+      tooltip.style.top    = '50%';
+      tooltip.style.left   = '50%';
+      tooltip.style.transform = 'translate(-50%, -50%)';
+    }
+  }
+}
+
+function _posicionarTooltip(tooltip, targetRect, pos) {
+  if (!tooltip) return;
+  const tw = 300; // max-width del tooltip
+  const th = 120; // altura estimada
+  const gap = 12;
+  let top, left;
+
+  tooltip.style.transform = '';
+
+  switch (pos) {
+    case 'bottom':
+      top  = targetRect.bottom + gap;
+      left = targetRect.left + targetRect.width / 2 - tw / 2;
+      break;
+    case 'top':
+      top  = targetRect.top - th - gap;
+      left = targetRect.left + targetRect.width / 2 - tw / 2;
+      break;
+    case 'left':
+      top  = targetRect.top + targetRect.height / 2 - th / 2;
+      left = targetRect.left - tw - gap;
+      break;
+    default: // right
+      top  = targetRect.top + targetRect.height / 2 - th / 2;
+      left = targetRect.right + gap;
+  }
+
+  // Mantener dentro del viewport
+  left = Math.max(12, Math.min(left, window.innerWidth  - tw  - 12));
+  top  = Math.max(12, Math.min(top,  window.innerHeight - th  - 12));
+
+  tooltip.style.top  = `${top}px`;
+  tooltip.style.left = `${left}px`;
+}
+
+function _avanzarPasoOb() {
+  if (_obPasoActual < _OB_PASOS.length - 1) {
+    _obPasoActual++;
+    _mostrarPasoOb(_obPasoActual);
+  } else {
+    // Último paso → pantalla final
+    document.getElementById('ob-pasos').hidden = true;
+    document.getElementById('ob-final').hidden = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   10. INIT
+═══════════════════════════════════════════════════════ */
+
+document.addEventListener('DOMContentLoaded', async () => {
+
+  /* ── Render inicial del carrito (vacío) ── */
+  _syncCarrito();
+
+  /* ── Cargar menú desde Google Sheets ── */
+  await renderMenu(
+    document.getElementById('menu-grid'),
+    (producto, masa) => {
+      // En móvil: agregar directo
+      // En desktop (col-detalle visible): mostrar panel de masa primero
+      const colDetalle = document.getElementById('col-detalle');
+      const esDesktop  = window.innerWidth >= 768;
+
+      if (esDesktop && colDetalle) {
+        mostrarPanelMasa(producto);
+      } else {
+        // En móvil el callback viene con masa ya seleccionada desde la card
+        agregarAlCarrito(producto, masa);
+        mostrarToast(`${producto.Nombre} (${masa}) agregada 🫓`, 'success', 2000);
+      }
+    }
+  );
+
+  /* ── Panel de masa (desktop): botones Maíz / Arroz ── */
+  ['btn-masa-maiz', 'btn-masa-arroz'].forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      if (!_productoSeleccionado) return;
+      const masa = btn.dataset.masa;
+      agregarAlCarrito(_productoSeleccionado, masa);
+      mostrarToast(`${_productoSeleccionado.Nombre} (${masa}) agregada 🫓`, 'success', 2000);
+      // Feedback visual en el botón
+      document.querySelectorAll('#dmp-masas .btn-masa').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  /* ── Drawer carrito (móvil) ── */
+  document.getElementById('btn-abrir-carrito')
+    ?.addEventListener('click', abrirDrawer);
+  document.getElementById('btn-cerrar-carrito')
+    ?.addEventListener('click', cerrarDrawer);
+  document.getElementById('drawer-overlay')
+    ?.addEventListener('click', cerrarDrawer);
+
+  /* ── Botones confirmar pedido ── */
+  ['btn-confirmar', 'drawer-btn-confirmar'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', () => {
+      cerrarDrawer();
+      abrirModal();
+    });
+  });
+
+  /* ── Modal formulario ── */
+  document.getElementById('modal-pedido-close')
+    ?.addEventListener('click', cerrarModal);
+  document.getElementById('modal-pedido-cancel')
+    ?.addEventListener('click', cerrarModal);
+  document.getElementById('modal-pedido-overlay')
+    ?.addEventListener('click', e => {
+      if (e.target === document.getElementById('modal-pedido-overlay')) cerrarModal();
+    });
+
+  // Tipo de entrega
+  document.querySelectorAll('.btn-entrega').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.btn-entrega').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      _tipoEntregaSeleccionada = btn.dataset.valor;
+      document.getElementById('form-domicilio').hidden =
+        _tipoEntregaSeleccionada !== ENTREGA.DOMICILIO;
+      _validarFormulario();
+    });
+  });
+
+  // Validación en tiempo real
+  ['campo-nombre', 'campo-whatsapp', 'campo-casa', 'campo-pasaje', 'campo-referencia']
+    .forEach(id => {
+      document.getElementById(id)
+        ?.addEventListener('input', _validarFormulario);
+    });
+
+  // Enviar pedido
+  document.getElementById('modal-pedido-submit')
+    ?.addEventListener('click', enviarPedidoCompleto);
+
+  /* ── Onboarding ── */
+  document.getElementById('ob-btn-comenzar')
+    ?.addEventListener('click', _iniciarPasos);
+  document.getElementById('ob-btn-saltar')
+    ?.addEventListener('click', _cerrarOnboarding);
+  document.getElementById('ob-btn-next')
+    ?.addEventListener('click', _avanzarPasoOb);
+  document.getElementById('ob-btn-finalizar')
+    ?.addEventListener('click', _cerrarOnboarding);
+
+  _mostrarOnboarding();
+
 });

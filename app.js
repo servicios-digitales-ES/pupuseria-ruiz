@@ -1,20 +1,20 @@
 /* ═══════════════════════════════════════════════════════
-   PUPUSERÍA RUIZ — app.js
+   PUPUSERÍA RUIZ — app.js  Fase 1
    -------------------------------------------------------
-   Responsabilidades:
    1.  Estado global del carrito
    2.  Render y sincronización del carrito (desktop + drawer)
-   3.  Panel de selección de masa (col-detalle)
-   4.  Modal formulario de pedido
-   5.  Envío del pedido a Google Sheets
-   6.  Pantalla de éxito
-   7.  Onboarding interactivo
+   3.  Panel de selección de masa (col-detalle, desktop)
+   4.  Drawer carrito (móvil)
+   5.  Modal formulario de pedido
+   6.  Envío del pedido a Google Sheets
+   7.  Pantalla de éxito
    8.  Animaciones (bounce, glow, float +1, shake)
-   9.  Toast de retroalimentación
-   10. Init
+   9.  Toast
+   10. Onboarding interactivo
+   11. Init
    -------------------------------------------------------
-   Depende de: config.js, menu.js
-   NO hardcodea datos de productos.
+   Depende de: config.js (API_URL, ESTADOS, ENTREGA, LS, helpers),
+               menu.js   (renderMenu, _animarAgregar target)
 ═══════════════════════════════════════════════════════ */
 
 'use strict';
@@ -23,19 +23,14 @@
    1. ESTADO GLOBAL
 ═══════════════════════════════════════════════════════ */
 
-/**
- * Carrito: array plano de ítems.
- * Cada ítem: { uid, id, nombre, masa, precio_unitario }
- */
 let carrito      = [];
 let _uidCounter  = 0;
-let _productoSeleccionado = null;  // producto activo en col-detalle
+let _productoSeleccionado = null;
 
 /* ═══════════════════════════════════════════════════════
    2. LÓGICA DEL CARRITO
 ═══════════════════════════════════════════════════════ */
 
-/** Agrega un ítem al carrito y dispara UI. */
 function agregarAlCarrito(producto, masa) {
   carrito.push({
     uid:             ++_uidCounter,
@@ -48,25 +43,13 @@ function agregarAlCarrito(producto, masa) {
   _animarAgregar(producto.ID, masa);
 }
 
-/** Elimina una unidad del carrito (por id + masa). */
 function quitarDelCarrito(id, masa) {
   const idx = carrito.map(i => i.id + '||' + i.masa).lastIndexOf(id + '||' + masa);
-  if (idx !== -1) {
-    carrito.splice(idx, 1);
-    _syncCarrito();
-  }
+  if (idx !== -1) { carrito.splice(idx, 1); _syncCarrito(); }
 }
 
-/** Vacía el carrito completo. */
-function vaciarCarrito() {
-  carrito = [];
-  _syncCarrito();
-}
+function vaciarCarrito() { carrito = []; _syncCarrito(); }
 
-/**
- * Agrupa los ítems del carrito para renderizar.
- * @returns {Array<{id,nombre,masa,cant,precio_unitario,subtotal}>}
- */
 function _agrupar() {
   const mapa = new Map();
   carrito.forEach(item => {
@@ -89,50 +72,46 @@ function _agrupar() {
   return [...mapa.values()];
 }
 
-/** Calcula el total del carrito. */
 function _calcularTotal() {
   return +_agrupar().reduce((acc, g) => acc + g.subtotal, 0).toFixed(2);
 }
 
-/** Sincroniza carrito en desktop, drawer, badge y botones confirmar. */
 function _syncCarrito() {
-  const grupos = _agrupar();
-  const total  = _calcularTotal();
+  const grupos   = _agrupar();
+  const total    = _calcularTotal();
   const hayItems = carrito.length > 0;
 
   _renderLineas(document.getElementById('carrito-items'),       grupos);
   _renderLineas(document.getElementById('drawer-carrito-items'), grupos);
 
   // Total desktop
-  const elTotal   = document.getElementById('carrito-total');
-  const elValor   = document.getElementById('ct-valor');
-  if (elTotal && elValor) {
-    elTotal.hidden = !hayItems;
-    elValor.textContent = formatPrecio(total);
-  }
+  const elTotal = document.getElementById('carrito-total');
+  const elValor = document.getElementById('ct-valor');
+  if (elTotal && elValor) { elTotal.hidden = !hayItems; elValor.textContent = formatPrecio(total); }
 
   // Total drawer
-  const elTotalD  = document.getElementById('drawer-carrito-total');
-  const elValorD  = document.getElementById('drawer-ct-valor');
-  if (elTotalD && elValorD) {
-    elTotalD.hidden = !hayItems;
-    elValorD.textContent = formatPrecio(total);
+  const elTotalD = document.getElementById('drawer-carrito-total');
+  const elValorD = document.getElementById('drawer-ct-valor');
+  if (elTotalD && elValorD) { elTotalD.hidden = !hayItems; elValorD.textContent = formatPrecio(total); }
+
+  // Count badge en carrito desktop
+  const count = document.getElementById('carrito-count');
+  if (count) {
+    if (hayItems) { count.textContent = `${carrito.length} ítem${carrito.length !== 1 ? 's' : ''}`; count.hidden = false; }
+    else count.hidden = true;
   }
 
   // Botones confirmar
-  [
-    document.getElementById('btn-confirmar'),
-    document.getElementById('drawer-btn-confirmar'),
-  ].forEach(btn => { if (btn) btn.disabled = !hayItems; });
+  ['btn-confirmar', 'drawer-btn-confirmar'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = !hayItems;
+  });
 
-  // Badge header móvil
   _actualizarBadge();
 }
 
-/** Renderiza las líneas del carrito en un contenedor. */
 function _renderLineas(contenedor, grupos) {
   if (!contenedor) return;
-
   if (grupos.length === 0) {
     contenedor.innerHTML = `
       <div class="carrito-vacio">
@@ -142,7 +121,6 @@ function _renderLineas(contenedor, grupos) {
       </div>`;
     return;
   }
-
   contenedor.innerHTML = grupos.map(g => `
     <div class="carrito-linea" data-id="${g.id}" data-masa="${g.masa}">
       <div class="cl-info">
@@ -150,27 +128,22 @@ function _renderLineas(contenedor, grupos) {
         <span class="cl-masa">${_iconoMasa(g.masa)} ${g.masa}</span>
       </div>
       <div class="cl-controles">
-        <button class="cl-btn cl-btn--quitar"
-          data-id="${g.id}" data-masa="${g.masa}"
-          aria-label="Quitar una ${g.nombre}">−</button>
+        <button class="cl-btn cl-btn--quitar" data-id="${g.id}" data-masa="${g.masa}" aria-label="Quitar una ${g.nombre}">−</button>
         <span class="cl-cant">${g.cant}</span>
         <span class="cl-subtotal">${formatPrecio(g.subtotal)}</span>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 
   contenedor.querySelectorAll('.cl-btn--quitar').forEach(btn => {
     btn.addEventListener('click', () => quitarDelCarrito(btn.dataset.id, btn.dataset.masa));
   });
 }
 
-/** Actualiza el badge del header móvil. */
 function _actualizarBadge() {
   const badge = document.getElementById('header-badge');
   if (!badge) return;
-  const n = carrito.length;
-  badge.textContent = n;
-  badge.hidden      = n === 0;
+  badge.textContent = carrito.length;
+  badge.hidden = carrito.length === 0;
 }
 
 function _iconoMasa(masa) {
@@ -180,31 +153,22 @@ function _iconoMasa(masa) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   3. PANEL DE SELECCIÓN DE MASA (col-detalle, solo desktop)
+   3. PANEL DE SELECCIÓN DE MASA (desktop)
 ═══════════════════════════════════════════════════════ */
 
-/** Muestra el panel de selección de masa para un producto. */
 function mostrarPanelMasa(producto) {
   _productoSeleccionado = producto;
-
   const placeholder = document.getElementById('detalle-placeholder');
   const panel       = document.getElementById('detalle-masa-panel');
-  const elNombre    = document.getElementById('dmp-producto');
-
   if (!panel) return;
-
   if (placeholder) placeholder.hidden = true;
   panel.hidden = false;
-
-  elNombre.innerHTML = `
-    <span class="dmp-nombre">${producto.Nombre}</span>
+  document.getElementById('dmp-producto').innerHTML = `
+    <div class="dmp-nombre">${producto.Nombre}</div>
     <div class="dmp-precio">${formatPrecio(producto.Precio_unitario)}</div>`;
-
-  // Resaltar el último botón activo si aplica
   document.querySelectorAll('#dmp-masas .btn-masa').forEach(b => b.classList.remove('active'));
 }
 
-/** Oculta el panel y muestra el placeholder. */
 function ocultarPanelMasa() {
   _productoSeleccionado = null;
   const placeholder = document.getElementById('detalle-placeholder');
@@ -222,7 +186,7 @@ function abrirDrawer() {
   const overlay = document.getElementById('drawer-overlay');
   if (!drawer) return;
   overlay.hidden = false;
-  drawer.classList.add('open');
+  requestAnimationFrame(() => drawer.classList.add('open'));
   document.body.style.overflow = 'hidden';
 }
 
@@ -231,14 +195,11 @@ function cerrarDrawer() {
   const overlay = document.getElementById('drawer-overlay');
   if (!drawer) return;
   drawer.classList.remove('open');
-  setTimeout(() => {
-    overlay.hidden = true;
-    document.body.style.overflow = '';
-  }, 300);
+  setTimeout(() => { overlay.hidden = true; document.body.style.overflow = ''; }, 320);
 }
 
 /* ═══════════════════════════════════════════════════════
-   5. MODAL FORMULARIO DE PEDIDO
+   5. MODAL FORMULARIO
 ═══════════════════════════════════════════════════════ */
 
 let _tipoEntregaSeleccionada = '';
@@ -246,27 +207,25 @@ let _tipoEntregaSeleccionada = '';
 function abrirModal() {
   if (carrito.length === 0) return;
 
-  // Llenar resumen del modal
   _renderResumenModal();
-
-  // Limpiar estado anterior
   _tipoEntregaSeleccionada = '';
-  document.getElementById('campo-nombre').value    = '';
-  document.getElementById('campo-whatsapp').value  = '';
-  document.getElementById('campo-casa').value      = '';
-  document.getElementById('campo-pasaje').value    = '';
-  document.getElementById('campo-referencia').value = '';
-  document.getElementById('form-domicilio').hidden  = true;
+
+  // Limpiar form
+  ['campo-nombre','campo-whatsapp','campo-casa','campo-pasaje','campo-referencia']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+
+  document.getElementById('form-domicilio').hidden = true;
   document.querySelectorAll('.btn-entrega').forEach(b => b.classList.remove('selected'));
   document.getElementById('modal-pedido-submit').disabled = true;
 
-  // Mostrar modal
+  // Ocultar hint WA hasta que elijan entrega
+  const waHint = document.getElementById('wa-hint');
+  if (waHint) waHint.hidden = true;
+
   const overlay = document.getElementById('modal-pedido-overlay');
   overlay.hidden = false;
   document.body.style.overflow = 'hidden';
-
-  // Focus primer campo
-  setTimeout(() => document.getElementById('campo-nombre').focus(), 50);
+  setTimeout(() => document.getElementById('campo-nombre').focus(), 60);
 }
 
 function cerrarModal() {
@@ -279,11 +238,10 @@ function _renderResumenModal() {
   const total  = _calcularTotal();
   const el     = document.getElementById('modal-resumen');
   if (!el) return;
-
   el.innerHTML = `
     ${grupos.map(g => `
       <div class="mr-linea">
-        <span>${g.cant} × ${g.nombre} <small>(${g.masa})</small></span>
+        <span>${g.cant} × ${g.nombre} <small style="opacity:.65">(${g.masa})</small></span>
         <span>${formatPrecio(g.subtotal)}</span>
       </div>`).join('')}
     <div class="mr-total">
@@ -292,24 +250,22 @@ function _renderResumenModal() {
     </div>`;
 }
 
-/** Valida el formulario y habilita/deshabilita el botón enviar. */
 function _validarFormulario() {
-  const nombre   = document.getElementById('campo-nombre').value.trim();
-  const entrega  = _tipoEntregaSeleccionada;
-  let ok = nombre.length > 0 && entrega !== '';
-
+  const nombre  = document.getElementById('campo-nombre')?.value.trim();
+  const entrega = _tipoEntregaSeleccionada;
+  let ok = !!(nombre && entrega);
   if (entrega === ENTREGA.DOMICILIO) {
-    const casa      = document.getElementById('campo-casa').value.trim();
-    const pasaje    = document.getElementById('campo-pasaje').value.trim();
-    const referencia = document.getElementById('campo-referencia').value.trim();
-    ok = ok && casa !== '' && pasaje !== '' && referencia !== '';
+    const casa  = document.getElementById('campo-casa')?.value.trim();
+    const pasaje = document.getElementById('campo-pasaje')?.value.trim();
+    const ref   = document.getElementById('campo-referencia')?.value.trim();
+    ok = ok && !!(casa && pasaje && ref);
   }
-
-  document.getElementById('modal-pedido-submit').disabled = !ok;
+  const btn = document.getElementById('modal-pedido-submit');
+  if (btn) btn.disabled = !ok;
 }
 
 /* ═══════════════════════════════════════════════════════
-   6. ENVÍO DEL PEDIDO
+   6. ENVÍO A GOOGLE SHEETS
 ═══════════════════════════════════════════════════════ */
 
 async function enviarPedidoCompleto() {
@@ -320,20 +276,19 @@ async function enviarPedidoCompleto() {
   const pasaje     = document.getElementById('campo-pasaje').value.trim();
   const referencia = document.getElementById('campo-referencia').value.trim();
 
-  // UI: mostrar spinner
-  document.getElementById('submit-texto').hidden  = true;
-  document.getElementById('submit-spinner').hidden = false;
+  // UI: spinner
+  document.getElementById('submit-texto').hidden   = true;
+  document.getElementById('submit-spinner').hidden  = false;
   document.getElementById('modal-pedido-submit').disabled = true;
 
-  // Construir payload
-  const grupos = _agrupar();
+  const grupos  = _agrupar();
   const payload = {
     nombre_cliente: nombre,
     tipo_entrega:   entrega,
-    casa:           entrega === ENTREGA.DOMICILIO ? casa      : '',
-    pasaje:         entrega === ENTREGA.DOMICILIO ? pasaje    : '',
+    casa:           entrega === ENTREGA.DOMICILIO ? casa       : '',
+    pasaje:         entrega === ENTREGA.DOMICILIO ? pasaje     : '',
     referencia:     entrega === ENTREGA.DOMICILIO ? referencia : '',
-    whatsapp:       whatsapp,
+    whatsapp,
     estado:         ESTADOS.ENVIADO,
     items:          grupos.map(g => ({
       producto:        g.nombre,
@@ -347,10 +302,8 @@ async function enviarPedidoCompleto() {
 
   try {
     const respuesta = await enviarPedido(payload);
-
-    // Guardar ID en localStorage para estado.html
-    const idPedido = respuesta.id || respuesta.ID_pedido || respuesta.pedido_id || '';
-    if (idPedido) lsSet(LS.ULTIMO_ID, idPedido);
+    const idPedido  = respuesta.id || respuesta.ID_pedido || respuesta.pedido_id || '';
+    if (idPedido) lsSet(LS.ULTIMO_ID, String(idPedido));
 
     cerrarModal();
     cerrarDrawer();
@@ -359,11 +312,9 @@ async function enviarPedidoCompleto() {
 
   } catch (err) {
     console.error('Error enviando pedido:', err);
-    mostrarToast('Hubo un problema al enviar tu pedido. Inténtalo de nuevo.', 'error');
-
-    // Restaurar botón
-    document.getElementById('submit-texto').hidden  = false;
-    document.getElementById('submit-spinner').hidden = true;
+    mostrarToast('Hubo un problema al enviar. Intenta de nuevo.', 'error');
+    document.getElementById('submit-texto').hidden   = false;
+    document.getElementById('submit-spinner').hidden  = true;
     document.getElementById('modal-pedido-submit').disabled = false;
   }
 }
@@ -373,18 +324,13 @@ async function enviarPedidoCompleto() {
 ═══════════════════════════════════════════════════════ */
 
 function _mostrarExito({ idPedido, total }) {
-  const ahora = new Date();
-
   document.getElementById('exito-num-pedido').textContent = idPedido ? `#${idPedido}` : '—';
   document.getElementById('exito-fecha').textContent      = formatFecha();
   document.getElementById('exito-hora').textContent       = formatHora();
   document.getElementById('exito-total').textContent      = formatPrecio(total);
 
-  // Actualizar href del botón "Ver estado"
   const btnEstado = document.getElementById('btn-ver-estado');
-  if (btnEstado && idPedido) {
-    btnEstado.href = `estado.html?id=${idPedido}`;
-  }
+  if (btnEstado && idPedido) btnEstado.href = `estado.html?id=${idPedido}`;
 
   document.getElementById('pantalla-exito').hidden = false;
   document.body.style.overflow = 'hidden';
@@ -396,46 +342,37 @@ function _mostrarExito({ idPedido, total }) {
 ═══════════════════════════════════════════════════════ */
 
 /**
- * Dispara bounce en el botón de masa, float +1 y glow en la card,
- * y shake en el carrito.
+ * Bounce en el botón pulsado, float +1, glow en card, shake carrito.
+ * FIX: también se llama desde los botones del panel de masa (desktop).
  */
 function _animarAgregar(productoId, masa) {
-  // 1. Bounce en el botón de masa pulsado
   const slugM = masa === 'Maíz' ? 'maiz' : 'arroz';
-  const cards = document.querySelectorAll(`.pupusa-card[data-id="${productoId}"]`);
-  cards.forEach(card => {
-    const btn = card.querySelector(`.btn-masa--${slugM}`);
-    if (btn) {
-      btn.classList.remove('btn-bounce');
-      void btn.offsetWidth; // reflow para reiniciar animación
-      btn.classList.add('btn-bounce');
-      btn.addEventListener('animationend', () => btn.classList.remove('btn-bounce'), { once: true });
-    }
 
-    // 3. Glow en la card
+  // ── Cards del menú ──
+  document.querySelectorAll(`.pupusa-card[data-id="${productoId}"]`).forEach(card => {
+    const btn = card.querySelector(`.btn-masa--${slugM}`);
+    if (btn) _bounceBtn(btn);
+
+    // Glow en la card
     card.classList.remove('card-glow');
     void card.offsetWidth;
     card.classList.add('card-glow');
     card.addEventListener('animationend', () => card.classList.remove('card-glow'), { once: true });
 
-    // 2. Float +1 sobre el botón
-    if (btn) {
-      const rect = btn.getBoundingClientRect();
-      const el   = document.createElement('span');
-      el.className     = 'float-plus';
-      el.textContent   = '+1';
-      el.style.left    = `${rect.left + rect.width / 2 - 16}px`;
-      el.style.top     = `${rect.top + window.scrollY - 10}px`;
-      document.body.appendChild(el);
-      el.addEventListener('animationend', () => el.remove(), { once: true });
-    }
+    // Float +1 sobre el botón
+    if (btn) _floatPlus(btn);
   });
 
-  // 4. Shake en el carrito (desktop y drawer)
-  [
-    document.getElementById('col-carrito'),
-    document.getElementById('drawer-carrito'),
-  ].forEach(el => {
+  // ── Panel de masa desktop (si el botón está activo) ──
+  const panelBtn = document.querySelector(`#dmp-masas .btn-masa--${slugM}`);
+  if (panelBtn && !document.getElementById('detalle-masa-panel').hidden) {
+    _bounceBtn(panelBtn);
+    _floatPlus(panelBtn);
+  }
+
+  // ── Shake en carrito ──
+  ['col-carrito', 'drawer-carrito'].forEach(id => {
+    const el = document.getElementById(id);
     if (!el) return;
     el.classList.remove('cart-shake');
     void el.offsetWidth;
@@ -444,31 +381,37 @@ function _animarAgregar(productoId, masa) {
   });
 }
 
+function _bounceBtn(btn) {
+  btn.classList.remove('btn-bounce');
+  void btn.offsetWidth;
+  btn.classList.add('btn-bounce');
+  btn.addEventListener('animationend', () => btn.classList.remove('btn-bounce'), { once: true });
+}
+
+function _floatPlus(referenceEl) {
+  const rect = referenceEl.getBoundingClientRect();
+  const el   = document.createElement('span');
+  el.className   = 'float-plus';
+  el.textContent = '+1';
+  el.style.left  = `${rect.left + rect.width / 2 - 14}px`;
+  el.style.top   = `${rect.top + window.scrollY - 8}px`;
+  document.body.appendChild(el);
+  el.addEventListener('animationend', () => el.remove(), { once: true });
+}
+
 /* ═══════════════════════════════════════════════════════
    9. TOAST
 ═══════════════════════════════════════════════════════ */
 
 let _toastTimer = null;
 
-/**
- * Muestra un mensaje toast temporal.
- * @param {string} mensaje
- * @param {'info'|'success'|'error'} tipo
- * @param {number} duracion ms
- */
-function mostrarToast(mensaje, tipo = 'info', duracion = 3000) {
+function mostrarToast(mensaje, tipo = 'info', duracion = 2800) {
   const toast = document.getElementById('toast');
   if (!toast) return;
-
   toast.textContent = mensaje;
-  toast.className   = 'toast show';
-  if (tipo === 'success') toast.classList.add('toast--success');
-  if (tipo === 'error')   toast.classList.add('toast--error');
-
+  toast.className   = `toast show${tipo === 'success' ? ' toast--success' : tipo === 'error' ? ' toast--error' : ''}`;
   clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => {
-    toast.classList.remove('show');
-  }, duracion);
+  _toastTimer = setTimeout(() => toast.classList.remove('show'), duracion);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -476,47 +419,26 @@ function mostrarToast(mensaje, tipo = 'info', duracion = 3000) {
 ═══════════════════════════════════════════════════════ */
 
 const _OB_PASOS = [
-  {
-    texto:  'Aquí puedes ver todas nuestras pupusas disponibles. Toca una para elegirla.',
-    target: '#menu-grid',
-    pos:    'bottom',
-  },
-  {
-    texto:  'Cada pupusa puede pedirse en masa de maíz 🌽 o arroz 🌾. Toca la que prefieras.',
-    target: '#col-detalle',
-    pos:    'left',
-  },
-  {
-    texto:  'Toca "Maíz" o "Arroz" en cualquier tarjeta para agregar la pupusa a tu pedido.',
-    target: '.card-masas',
-    pos:    'bottom',
-  },
-  {
-    texto:  'Aquí aparece tu pedido en tiempo real. Puedes quitar ítems con el botón −.',
-    target: '#col-carrito',
-    pos:    'left',
-  },
-  {
-    texto:  'Cuando estés listo, toca "Confirmar pedido". Podrás elegir recoger en local o envío a domicilio.',
-    target: '#btn-confirmar',
-    pos:    'top',
-  },
-  {
-    texto:  'Después de enviar recibirás un número de pedido para consultar el estado en tiempo real.',
-    target: '#app-header',
-    pos:    'bottom',
-  },
-  {
-    texto:  'La cola pública muestra los pedidos en preparación. No se muestran datos personales.',
-    target: '#app-header',
-    pos:    'bottom',
-  },
+  { texto: 'Aquí puedes ver todas nuestras pupusas. Toca una para seleccionarla.',
+    target: '#menu-grid', pos: 'bottom' },
+  { texto: 'Elige la masa: maíz 🌽 o arroz 🌾. Cada pupusa puede pedirse en cualquiera.',
+    target: '#col-detalle', pos: 'left' },
+  { texto: 'Toca "Maíz" o "Arroz" para agregar la pupusa a tu pedido.',
+    target: '.card-masas', pos: 'bottom' },
+  { texto: 'Aquí aparece tu pedido en tiempo real. Puedes quitar ítems con el botón −.',
+    target: '#col-carrito', pos: 'left' },
+  { texto: 'Cuando estés listo, toca "Confirmar pedido". Podrás elegir recoger en local o envío a domicilio.',
+    target: '#btn-confirmar', pos: 'top' },
+  { texto: 'Después de enviar recibirás un número de pedido para consultar el estado en tiempo real.',
+    target: '#app-header', pos: 'bottom' },
+  { texto: 'La cola pública muestra los pedidos en preparación. No se muestran datos personales.',
+    target: '#app-header', pos: 'bottom' },
 ];
 
 let _obPasoActual = 0;
 
 function _mostrarOnboarding() {
-  if (lsGet(LS.ONBOARDING) === 'true') return; // ya visto
+  if (lsGet(LS.ONBOARDING) === 'true') return;
   const el = document.getElementById('onboarding');
   if (el) el.hidden = false;
 }
@@ -531,7 +453,7 @@ function _iniciarPasos() {
   document.getElementById('ob-welcome').hidden = true;
   document.getElementById('ob-pasos').hidden   = false;
   _obPasoActual = 0;
-  _mostrarPasoOb(_obPasoActual);
+  _mostrarPasoOb(0);
 }
 
 function _mostrarPasoOb(idx) {
@@ -539,15 +461,21 @@ function _mostrarPasoOb(idx) {
   const total     = _OB_PASOS.length;
   const tooltip   = document.getElementById('ob-tooltip');
   const texto     = document.getElementById('ob-tooltip-texto');
-  const indicator = document.getElementById('ob-step-indicator');
+  const pasoNum   = document.getElementById('ob-step-indicator');
   const nextBtn   = document.getElementById('ob-btn-next');
   const spotlight = document.getElementById('ob-spotlight');
+  const dotsEl    = document.getElementById('ob-dots');
 
-  texto.textContent      = paso.texto;
-  indicator.textContent  = `${idx + 1} / ${total}`;
-  nextBtn.textContent    = idx < total - 1 ? 'Siguiente →' : 'Ver resumen';
+  texto.textContent    = paso.texto;
+  pasoNum.textContent  = `Paso ${idx + 1} de ${total}`;
+  nextBtn.textContent  = idx < total - 1 ? 'Siguiente →' : 'Ver resumen';
 
-  // Spotlight: intentar resaltar el target
+  // Dots
+  if (dotsEl) {
+    dotsEl.innerHTML = _OB_PASOS.map((_, i) =>
+      `<div class="ob-dot${i === idx ? ' active' : ''}"></div>`).join('');
+  }
+
   const target = document.querySelector(paso.target);
   if (target && spotlight) {
     const rect = target.getBoundingClientRect();
@@ -562,50 +490,29 @@ function _mostrarPasoOb(idx) {
       `0 ${y1}px, ${x1}px ${y1}px, ${x1}px ${y2}px, ${x2}px ${y2}px,` +
       `${x2}px ${y1}px, 0 ${y1}px)`;
 
-    // Posicionar tooltip cerca del target
     _posicionarTooltip(tooltip, rect, paso.pos);
   } else {
-    // Sin target: centrar tooltip
     if (spotlight) spotlight.style.clipPath = 'none';
     if (tooltip) {
-      tooltip.style.top    = '50%';
-      tooltip.style.left   = '50%';
+      tooltip.style.top = '50%'; tooltip.style.left = '50%';
       tooltip.style.transform = 'translate(-50%, -50%)';
     }
   }
 }
 
-function _posicionarTooltip(tooltip, targetRect, pos) {
+function _posicionarTooltip(tooltip, rect, pos) {
   if (!tooltip) return;
-  const tw = 300; // max-width del tooltip
-  const th = 120; // altura estimada
-  const gap = 12;
+  const tw = 290; const th = 130; const gap = 14;
   let top, left;
-
   tooltip.style.transform = '';
-
   switch (pos) {
-    case 'bottom':
-      top  = targetRect.bottom + gap;
-      left = targetRect.left + targetRect.width / 2 - tw / 2;
-      break;
-    case 'top':
-      top  = targetRect.top - th - gap;
-      left = targetRect.left + targetRect.width / 2 - tw / 2;
-      break;
-    case 'left':
-      top  = targetRect.top + targetRect.height / 2 - th / 2;
-      left = targetRect.left - tw - gap;
-      break;
-    default: // right
-      top  = targetRect.top + targetRect.height / 2 - th / 2;
-      left = targetRect.right + gap;
+    case 'bottom': top = rect.bottom + gap; left = rect.left + rect.width / 2 - tw / 2; break;
+    case 'top':    top = rect.top - th - gap; left = rect.left + rect.width / 2 - tw / 2; break;
+    case 'left':   top = rect.top + rect.height / 2 - th / 2; left = rect.left - tw - gap; break;
+    default:       top = rect.top + rect.height / 2 - th / 2; left = rect.right + gap;
   }
-
-  // Mantener dentro del viewport
-  left = Math.max(12, Math.min(left, window.innerWidth  - tw  - 12));
-  top  = Math.max(12, Math.min(top,  window.innerHeight - th  - 12));
-
+  left = Math.max(12, Math.min(left, window.innerWidth  - tw - 12));
+  top  = Math.max(12, Math.min(top,  window.innerHeight - th - 12));
   tooltip.style.top  = `${top}px`;
   tooltip.style.left = `${left}px`;
 }
@@ -615,14 +522,13 @@ function _avanzarPasoOb() {
     _obPasoActual++;
     _mostrarPasoOb(_obPasoActual);
   } else {
-    // Último paso → pantalla final
     document.getElementById('ob-pasos').hidden = true;
     document.getElementById('ob-final').hidden = false;
   }
 }
 
 /* ═══════════════════════════════════════════════════════
-   10. INIT
+   11. INIT
 ═══════════════════════════════════════════════════════ */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -634,43 +540,38 @@ document.addEventListener('DOMContentLoaded', async () => {
   await renderMenu(
     document.getElementById('menu-grid'),
     (producto, masa) => {
-      // En móvil: agregar directo
-      // En desktop (col-detalle visible): mostrar panel de masa primero
       const colDetalle = document.getElementById('col-detalle');
-      const esDesktop  = window.innerWidth >= 768;
+      const esDesktop  = window.innerWidth >= 768 && colDetalle;
 
-      if (esDesktop && colDetalle) {
+      if (esDesktop) {
         mostrarPanelMasa(producto);
       } else {
-        // En móvil el callback viene con masa ya seleccionada desde la card
+        // Móvil: agregar directo con la masa elegida en el botón de la card
         agregarAlCarrito(producto, masa);
-        mostrarToast(`${producto.Nombre} (${masa}) agregada 🫓`, 'success', 2000);
+        mostrarToast(`${producto.Nombre} (${masa}) agregada 🫓`, 'success');
       }
     }
   );
 
-  /* ── Panel de masa (desktop): botones Maíz / Arroz ── */
-  ['btn-masa-maiz', 'btn-masa-arroz'].forEach(btnId => {
+  /* ── Panel de masa desktop ── */
+    ['btn-masa-maiz', 'btn-masa-arroz'].forEach(btnId => {
     const btn = document.getElementById(btnId);
     if (!btn) return;
     btn.addEventListener('click', () => {
       if (!_productoSeleccionado) return;
       const masa = btn.dataset.masa;
       agregarAlCarrito(_productoSeleccionado, masa);
-      mostrarToast(`${_productoSeleccionado.Nombre} (${masa}) agregada 🫓`, 'success', 2000);
-      // Feedback visual en el botón
+      mostrarToast(`${_productoSeleccionado.Nombre} (${masa}) agregada 🫓`, 'success');
+      // Marcar visualmente el botón activo
       document.querySelectorAll('#dmp-masas .btn-masa').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     });
   });
 
   /* ── Drawer carrito (móvil) ── */
-  document.getElementById('btn-abrir-carrito')
-    ?.addEventListener('click', abrirDrawer);
-  document.getElementById('btn-cerrar-carrito')
-    ?.addEventListener('click', cerrarDrawer);
-  document.getElementById('drawer-overlay')
-    ?.addEventListener('click', cerrarDrawer);
+  document.getElementById('btn-abrir-carrito')?.addEventListener('click', abrirDrawer);
+  document.getElementById('btn-cerrar-carrito')?.addEventListener('click', cerrarDrawer);
+  document.getElementById('drawer-overlay')?.addEventListener('click', cerrarDrawer);
 
   /* ── Botones confirmar pedido ── */
   ['btn-confirmar', 'drawer-btn-confirmar'].forEach(id => {
@@ -681,14 +582,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   /* ── Modal formulario ── */
-  document.getElementById('modal-pedido-close')
-    ?.addEventListener('click', cerrarModal);
-  document.getElementById('modal-pedido-cancel')
-    ?.addEventListener('click', cerrarModal);
-  document.getElementById('modal-pedido-overlay')
-    ?.addEventListener('click', e => {
-      if (e.target === document.getElementById('modal-pedido-overlay')) cerrarModal();
-    });
+  document.getElementById('modal-pedido-close')?.addEventListener('click', cerrarModal);
+  document.getElementById('modal-pedido-cancel')?.addEventListener('click', cerrarModal);
+  document.getElementById('modal-pedido-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-pedido-overlay')) cerrarModal();
+  });
 
   // Tipo de entrega
   document.querySelectorAll('.btn-entrega').forEach(btn => {
@@ -696,32 +594,32 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.querySelectorAll('.btn-entrega').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
       _tipoEntregaSeleccionada = btn.dataset.valor;
+
+      // Mostrar/ocultar campos domicilio
       document.getElementById('form-domicilio').hidden =
         _tipoEntregaSeleccionada !== ENTREGA.DOMICILIO;
+
+      // FIX: mostrar mensaje WA para AMBOS tipos de entrega
+      const waHint = document.getElementById('wa-hint');
+      if (waHint) waHint.hidden = false;
+
       _validarFormulario();
     });
   });
 
   // Validación en tiempo real
-  ['campo-nombre', 'campo-whatsapp', 'campo-casa', 'campo-pasaje', 'campo-referencia']
-    .forEach(id => {
-      document.getElementById(id)
-        ?.addEventListener('input', _validarFormulario);
-    });
+  ['campo-nombre','campo-whatsapp','campo-casa','campo-pasaje','campo-referencia'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', _validarFormulario);
+  });
 
   // Enviar pedido
-  document.getElementById('modal-pedido-submit')
-    ?.addEventListener('click', enviarPedidoCompleto);
+  document.getElementById('modal-pedido-submit')?.addEventListener('click', enviarPedidoCompleto);
 
   /* ── Onboarding ── */
-  document.getElementById('ob-btn-comenzar')
-    ?.addEventListener('click', _iniciarPasos);
-  document.getElementById('ob-btn-saltar')
-    ?.addEventListener('click', _cerrarOnboarding);
-  document.getElementById('ob-btn-next')
-    ?.addEventListener('click', _avanzarPasoOb);
-  document.getElementById('ob-btn-finalizar')
-    ?.addEventListener('click', _cerrarOnboarding);
+  document.getElementById('ob-btn-comenzar')?.addEventListener('click', _iniciarPasos);
+  document.getElementById('ob-btn-saltar')?.addEventListener('click', _cerrarOnboarding);
+  document.getElementById('ob-btn-next')?.addEventListener('click', _avanzarPasoOb);
+  document.getElementById('ob-btn-finalizar')?.addEventListener('click', _cerrarOnboarding);
 
   _mostrarOnboarding();
 

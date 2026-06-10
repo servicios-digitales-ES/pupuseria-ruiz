@@ -444,9 +444,13 @@ function _mostrarOnboarding() {
 }
 
 function _cerrarOnboarding() {
-  const el = document.getElementById('onboarding');
-  if (el) el.hidden = true;
-  lsSet(LS.ONBOARDING, 'true');
+  // 3 acciones atómicas — única función responsable de finalizar el onboarding
+  lsSet(LS.ONBOARDING, 'true');                                    // a) marcar completado
+  const ob = document.getElementById('onboarding');
+  if (ob) ob.hidden = true;                                        // b) ocultar onboarding
+  const menu = document.getElementById('app-layout') ||
+               document.querySelector('.app-layout');
+  if (menu) menu.hidden = false;                                   // c) garantizar menú visible
 }
 
 function _iniciarPasos() {
@@ -554,7 +558,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   );
 
   /* ── Panel de masa desktop ── */
-    ['btn-masa-maiz', 'btn-masa-arroz'].forEach(btnId => {
+  ['btn-masa-maiz', 'btn-masa-arroz'].forEach(btnId => {
     const btn = document.getElementById(btnId);
     if (!btn) return;
     btn.addEventListener('click', () => {
@@ -616,10 +620,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('modal-pedido-submit')?.addEventListener('click', enviarPedidoCompleto);
 
   /* ── Onboarding ── */
+  // NOTA: No se redirige automáticamente a pantalla de éxito con LS.ULTIMO_ID al cargar.
+  // El menú principal es siempre el estado por defecto al iniciar la app.
   document.getElementById('ob-btn-comenzar')?.addEventListener('click', _iniciarPasos);
-  document.getElementById('ob-btn-saltar')?.addEventListener('click', _cerrarOnboarding);
+  document.getElementById('ob-btn-saltar')?.addEventListener('click', _cerrarOnboarding);   // → _cerrarOnboarding (única responsable)
   document.getElementById('ob-btn-next')?.addEventListener('click', _avanzarPasoOb);
-  document.getElementById('ob-btn-finalizar')?.addEventListener('click', _cerrarOnboarding);
+  document.getElementById('ob-btn-finalizar')?.addEventListener('click', _cerrarOnboarding); // → _cerrarOnboarding (única responsable)
 
   _mostrarOnboarding();
 

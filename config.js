@@ -12,7 +12,7 @@
    ENDPOINT
 ───────────────────────────────────────────────────── */
 const API_URL =
-  'https://script.google.com/macros/s/AKfycbwn3-A2-BBZpxWFxXLJInGijDx3I7KoWMNYRUC1V635EXmFcfsScaU0bPAKU0TzqYtRA/exec';
+  'https://script.google.com/macros/s/AKfycbz8P7EzWnbWC_Rx9IyZdT9EdaqmZhzeVIuxUOeFR6-vvhYW7nECTS94UHCiPeMNR-lJ/exec';
 
 /* ─────────────────────────────────────────────────────
    CONFIGURACIÓN DE NEGOCIO (valores por defecto)
@@ -38,6 +38,7 @@ const POLL_INTERVAL = 5000;
 ───────────────────────────────────────────────────── */
 const ESTADOS = {
   ENVIADO:   'enviado',
+  RECIBIDO:  'recibido',
   TERMINADO: 'terminado',
 };
 
@@ -130,11 +131,51 @@ async function enviarPedido(pedidoData) {
 }
 
 /**
- * Marca un pedido como terminado.
- * @param {string|number} idPedido
+ * Cambia el estado de un pedido.
+ * @param {string} idPedido
+ * @param {'recibido'|'terminado'} estado
  */
+async function marcarEstado(idPedido, estado) {
+  return apiPost({ action: estado === 'recibido' ? 'marcarRecibido' : 'marcarTerminado', id: idPedido });
+}
+
+/** Mantener por compatibilidad */
 async function marcarTerminado(idPedido) {
-  return apiPost({ action: 'marcarTerminado', id: idPedido });
+  return marcarEstado(idPedido, 'terminado');
+}
+
+/* ─────────────────────────────────────────────────────
+   MENSAJES DE WHATSAPP AUTOMÁTICOS
+   Usados en el dashboard de la pupusera.
+───────────────────────────────────────────────────── */
+
+/**
+ * Genera el link de WhatsApp para notificar al cliente.
+ * @param {Object} pedido — { nombre_cliente, tipo_entrega, whatsapp }
+ * @returns {string} URL de wa.me lista para abrir
+ */
+function generarLinkWA(pedido) {
+  const nombre  = pedido.nombre_cliente || 'cliente';
+  const entrega = pedido.tipo_entrega   || '';
+  const numero  = (pedido.whatsapp || '').replace(/\D/g, '');
+  if (!numero) return null;
+
+  let mensaje;
+  if (entrega === ENTREGA.DOMICILIO) {
+    mensaje =
+      `¡Hola ${nombre}! 👋\n` +
+      `Su pedido de *Pupusería Ruiz* está listo. 🫓\n` +
+      `En este momento se lo enviamos a su casa. ¡Ya va en camino!`;
+  } else {
+    mensaje =
+      `¡Hola ${nombre}! 👋\n` +
+      `Su pedido de *Pupusería Ruiz* está listo para recoger. 🫓\n` +
+      `Le esperamos aquí en la pupusería.`;
+  }
+
+  // Número con código de El Salvador si no lo trae
+  const tel = numero.startsWith('503') ? numero : '503' + numero;
+  return `https://wa.me/${tel}?text=${encodeURIComponent(mensaje)}`;
 }
 
 /**
@@ -198,4 +239,4 @@ function lsGet(clave) {
 /** Guarda un valor en localStorage */
 function lsSet(clave, valor) {
   localStorage.setItem(clave, valor);
-                              }
+}

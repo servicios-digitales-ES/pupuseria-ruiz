@@ -12,7 +12,7 @@
    ENDPOINT
 ───────────────────────────────────────────────────── */
 const API_URL =
-  'https://script.google.com/macros/s/AKfycbz8P7EzWnbWC_Rx9IyZdT9EdaqmZhzeVIuxUOeFR6-vvhYW7nECTS94UHCiPeMNR-lJ/exec';
+  'https://script.google.com/macros/s/AKfycbwqLh4yPeWlIeoXy8bqDbsYJTDfqRTqgw_aj229Jx_5tv6YRvxFYelTTG51YdxpOXPM/exec';
 
 /* ─────────────────────────────────────────────────────
    CONFIGURACIÓN DE NEGOCIO (valores por defecto)
@@ -199,4 +199,4 @@ function lsGet(clave) {
 /** Guarda un valor en localStorage */
 function lsSet(clave, valor) {
   localStorage.setItem(clave, valor);
-}
+     }

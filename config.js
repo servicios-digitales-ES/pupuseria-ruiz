@@ -12,7 +12,7 @@
    ENDPOINT
 ───────────────────────────────────────────────────── */
 const API_URL =
-  'https://script.google.com/macros/s/AKfycbwn3-A2-BBZpxWFxXLJInGijDx3I7KoWMNYRUC1V635EXmFcfsScaU0bPAKU0TzqYtRA/exec';
+  'https://script.google.com/macros/s/AKfycbz8P7EzWnbWC_Rx9IyZdT9EdaqmZhzeVIuxUOeFR6-vvhYW7nECTS94UHCiPeMNR-lJ/exec';
 
 /* ─────────────────────────────────────────────────────
    CONFIGURACIÓN DE NEGOCIO (valores por defecto)
